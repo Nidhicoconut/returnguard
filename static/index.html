@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReturnGuard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bench:#e8ecf0; --panel:#ffffff; --line:#c9d2dc; --ink:#17202b; --muted:#5a6776;
+  --tape:#2f5d8c; --ok:#167a5b; --ok-bg:#e3f4ee; --warn:#a96a00; --warn-bg:#fbf0d9; --bad:#b23a2e; --bad-bg:#fbe7e4;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bench);color:var(--ink);font:15px/1.5 var(--body)}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 28px;background:var(--ink);color:#fff}
+.top h1{font-size:22px;font-weight:700}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:13px;padding:3px 10px;border:1px solid #4a586a;border-radius:999px;color:#d4dce6}
+.layout{display:grid;grid-template-columns:350px 1fr;gap:22px;padding:22px 28px;max-width:1280px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px}
+.panel+.panel{margin-top:18px}
+.panel h2{font-size:18px;margin-bottom:12px}
+label{display:block;font-weight:600;margin:12px 0 4px}
+select,input[type=text],textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:4px;background:#fff}
+textarea{min-height:76px;resize:vertical}
+.drop{display:grid;place-items:center;text-align:center;min-height:120px;border:2px dashed var(--line);border-radius:4px;padding:10px;color:var(--muted);cursor:pointer;overflow:hidden}
+.drop.over{border-color:var(--tape);background:#f2f6fb}
+.drop img{max-width:100%;max-height:180px;border-radius:3px}
+.btn{display:inline-block;border:0;border-radius:4px;padding:10px 16px;font-weight:600;background:var(--tape);color:#fff;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:progress}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.ok{background:var(--ok)} .btn.bad{background:var(--bad)}
+.error{margin-top:10px;padding:8px 10px;border-left:4px solid var(--bad);background:var(--bad-bg);border-radius:3px}
+.hint{color:var(--muted);font-size:13px}
+.cases{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:340px;overflow:auto}
+.case{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px;cursor:pointer}
+.case[aria-current=true]{border-color:var(--tape);box-shadow:0 0 0 2px #cfdcec}
+.case img{width:44px;height:44px;object-fit:cover;border-radius:3px}
+.case b{display:block;font-size:14px}
+.tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:3px;white-space:nowrap}
+.tag.ok{background:var(--ok-bg);color:var(--ok)} .tag.warn{background:var(--warn-bg);color:var(--warn)} .tag.bad{background:var(--bad-bg);color:var(--bad)} .tag.neutral{background:#eef1f4;color:var(--muted)}
+.empty{padding:60px 24px;text-align:center;color:var(--muted)}
+.empty h2{color:var(--ink);margin-bottom:8px}
+.workspace{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.photo{position:relative;background:#dfe5eb;border-radius:4px;overflow:hidden;line-height:0}
+.photo img{width:100%;display:block}
+.box{position:absolute;border:2px solid var(--bad);background:rgba(178,58,46,.10)}
+.box span{position:absolute;left:-2px;top:-24px;background:var(--bad);color:#fff;font:600 12px/1 var(--body);padding:5px 7px;border-radius:3px 3px 3px 0;white-space:nowrap}
+.box.flip span{top:auto;bottom:-24px;border-radius:0 3px 3px 3px}
+.photonote{margin-top:10px;line-height:1.45}
+.label{position:relative;border:2px dashed var(--ink);border-radius:6px;padding:16px 16px 14px;background:#fff}
+.label::before,.label::after{content:"";position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--bench);border:2px solid var(--ink);transform:translateY(-50%)}
+.label::before{left:-10px;clip-path:inset(0 0 0 50%)} .label::after{right:-10px;clip-path:inset(0 50% 0 0)}
+.label.ok{border-color:var(--ok)} .label.warn{border-color:var(--warn)} .label.bad{border-color:var(--bad)}
+.verdict{font:700 30px/1.1 var(--display)}
+.label.ok .verdict{color:var(--ok)} .label.warn .verdict{color:var(--warn)} .label.bad .verdict{color:var(--bad)}
+.meta{display:flex;gap:16px;flex-wrap:wrap;margin:8px 0;color:var(--muted);font-size:13px}
+.msg{margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line)}
+.section{margin-top:18px}
+.section h3{font-size:16px;margin-bottom:8px}
+ul.plain{margin:0;padding-left:18px}
+details{border:1px solid var(--line);border-radius:4px;padding:6px 10px;margin-top:6px;background:#fafbfc}
+summary{cursor:pointer;font-weight:600}
+.steps{list-style:none;margin:0;padding:0 0 0 14px;border-left:3px solid var(--line)}
+.steps li{position:relative;padding:0 0 10px 12px}
+.steps li::before{content:"";position:absolute;left:-22px;top:6px;width:11px;height:11px;border-radius:50%;background:var(--tape);border:2px solid #fff}
+.steps b{display:block}
+.steps small{color:var(--muted)}
+.review{display:grid;gap:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.hist{font-size:13px;color:var(--muted);margin:0;padding-left:18px}
+.loading{display:flex;gap:10px;align-items:center;margin-top:12px;color:var(--muted)}
+.spin{width:16px;height:16px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--tape);animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+@media (max-width:980px){.layout{grid-template-columns:1fr;padding:16px}.workspace{grid-template-columns:1fr}.top{padding:12px 16px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>ReturnGuard</h1>
+  <div class="chips" id="chips" aria-label="System status"></div>
+</header>
+
+<main class="layout">
+  <aside>
+    <section class="panel" aria-labelledby="newh">
+      <h2 id="newh">Start a return</h2>
+      <form id="form" novalidate>
+        <label for="order">Order</label>
+        <select id="order" required></select>
+        <label for="reason">What’s wrong?</label>
+        <textarea id="reason" maxlength="1000" placeholder="For example: the lid arrived cracked, or I changed my mind." required></textarea>
+        <label for="file">Photo of the item</label>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose or drop a photo">
+          <div id="dropText">Drop a photo here or click to choose one<br><span class="hint">JPEG, PNG or WebP, up to 8 MB</span></div>
+        </div>
+        <input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <div class="row" style="margin-top:14px"><button class="btn" id="submit" type="submit">Check this return</button></div>
+        <div id="formError" role="alert"></div>
+        <div class="loading" id="loading" hidden aria-live="polite"><span class="spin"></span>Inspecting the photo and checking policy…</div>
+      </form>
+    </section>
+    <section class="panel" aria-labelledby="listh">
+      <h2 id="listh">Recent cases</h2>
+      <ul class="cases" id="cases"></ul>
+    </section>
+  </aside>
+
+  <section id="stage" aria-live="polite"></section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const STATUS_CLASS = {"Approved":"ok","Rejected":"bad","Needs human review":"warn","Submitted":"neutral"};
+const STEP_NAMES = {lookup_order:"Looked up the order", analyze_image:"Inspected the photo", retrieve_policy:"Found the policy clauses", decide:"Made a decision", finalize:"Opened a ticket"};
+const RESOLUTION = {full_refund_or_replacement:"Full refund or replacement", store_credit:"Store credit"};
+let currentId = null, chosenFile = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Something went wrong. Try again.");
+  return body;
+}
+
+async function init() {
+  try {
+    const h = await api("/api/health");
+    $("chips").innerHTML = `<span class="chip">Vision: ${esc(h.vision_backend)}</span><span class="chip">Language model: ${esc(h.llm_provider === "rules" ? "policy rules only" : h.llm_provider)}</span><span class="chip">${h.return_window_days}-day window</span>`;
+    const orders = await api("/api/orders");
+    $("order").innerHTML = orders.map(o => `<option value="${esc(o.order_id)}">${esc(o.order_id)} — ${esc(o.product)} (₹${Number(o.price).toLocaleString("en-IN")})</option>`).join("")
+      + `<option value="ORD-0000">ORD-0000 — unknown order (test)</option>`;
+  } catch (e) { $("formError").innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+  await loadCases();
+  renderEmpty();
+}
+
+function renderEmpty() {
+  $("stage").innerHTML = `<div class="panel empty"><h2>No return open</h2><p>Fill in the form and add a photo. The inspection, the policy clauses used and the decision will appear here.</p><p class="hint">Sample photos are in the samples folder.</p></div>`;
+}
+
+async function loadCases() {
+  const list = await api("/api/cases");
+  $("cases").innerHTML = list.length ? list.map(c => `
+    <li><button class="case" data-id="${c.id}" ${c.id === currentId ? 'aria-current="true"' : ""}>
+      <img src="${esc(c.image_url)}" alt="">
+      <span><b>Case ${c.id}, ${esc(c.order_id)}</b><span class="hint">${esc((c.reason || "").slice(0, 40))}</span></span>
+      <span class="tag ${STATUS_CLASS[c.status] || "neutral"}">${esc(c.status)}</span>
+    </button></li>`).join("") : `<li class="hint">No cases yet.</li>`;
+}
+
+$("cases").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".case"); if (!btn) return;
+  try { showCase(await api(`/api/cases/${btn.dataset.id}`)); } catch (err) { alert(err.message); }
+});
+
+/* ---- photo picking ---- */
+function setFile(f) {
+  chosenFile = f;
+  if (!f) { $("dropText").innerHTML = "Drop a photo here or click to choose one<br><span class=\"hint\">JPEG, PNG or WebP, up to 8 MB</span>"; return; }
+  const url = URL.createObjectURL(f);
+  $("dropText").innerHTML = `<img src="${url}" alt="Selected photo preview"><div class="hint">${esc(f.name)}</div>`;
+}
+$("drop").addEventListener("click", () => $("file").click());
+$("drop").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+$("file").addEventListener("change", (e) => setFile(e.target.files[0] || null));
+["dragenter","dragover"].forEach(t => $("drop").addEventListener(t, (e) => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave","drop"].forEach(t => $("drop").addEventListener(t, (e) => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) setFile(f); });
+
+/* ---- submit ---- */
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("formError").innerHTML = "";
+  const reason = $("reason").value.trim();
+  if (!reason) return $("formError").innerHTML = `<div class="error">Describe what’s wrong with the item.</div>`;
+  if (!chosenFile) return $("formError").innerHTML = `<div class="error">Add a photo of the item.</div>`;
+  const fd = new FormData();
+  fd.append("order_id", $("order").value); fd.append("reason", reason); fd.append("image", chosenFile);
+  $("submit").disabled = true; $("loading").hidden = false;
+  try {
+    const c = await api("/api/cases", {method: "POST", body: fd});
+    showCase(c);
+  } catch (err) {
+    $("formError").innerHTML = `<div class="error">${esc(err.message)}</div>`;
+  } finally { $("submit").disabled = false; $("loading").hidden = true; }
+});
+
+/* ---- case view ---- */
+function showCase(c) {
+  currentId = c.id;
+  const cls = STATUS_CLASS[c.status] || "neutral";
+  const v = c.vision, d = c.decision_detail || {};
+  const boxes = (v?.regions || []).map(r => {
+    const flip = r.y < 0.1 ? " flip" : "";
+    return `<div class="box${flip}" style="left:${r.x*100}%;top:${r.y*100}%;width:${r.w*100}%;height:${r.h*100}%"><span>${esc(r.type)} ${Math.round(r.score*100)}%</span></div>`;
+  }).join("");
+  const clauses = (d.clauses || []).map(k => `<details><summary>${esc(k.id)}: ${esc(k.title)}</summary><p>${esc(k.text)}</p></details>`).join("");
+  const steps = (c.trace || []).map(s => `<li><b>${esc(STEP_NAMES[s.step] || s.step)}</b>${esc(s.summary)} <small>(${s.ms} ms)</small></li>`).join("");
+  const hist = (c.events || []).map(ev => `<li>${esc(ev.ts.replace("T"," "))}: ${esc(ev.actor)} ${esc(ev.action.replace(/_/g," "))}</li>`).join("");
+  const photoNote = v ? (v.regions.length
+      ? `Marked areas show where the ${esc(v.backend)} analysis found damage. If a box is wrong, say so under staff review.`
+      : (v.label === "intact" ? "No damage found on the item." : esc(v.note || ""))) : "The photo was not analysed because the order could not be found.";
+
+  $("stage").innerHTML = `
+  <div class="workspace">
+    <div class="panel">
+      <h2>Photo inspection</h2>
+      <div class="photo"><img src="${esc(c.image_url)}" alt="Customer photo of the item">${boxes}</div>
+      <p class="hint photonote">${photoNote}</p>
+      ${v ? `<p class="hint">Photo analysis: ${esc(v.label)}${v.defect_type ? `, ${esc(v.defect_type)}` : ""}, confidence ${Math.round(v.confidence*100)}%.</p>` : ""}
+    </div>
+    <div>
+      <div class="label ${cls}">
+        <div class="verdict">${esc(c.status)}</div>
+        <div class="meta"><span>Case ${c.id}</span><span>Order ${esc(c.order_id)}</span>${c.ticket_id ? `<span>Ticket ${esc(c.ticket_id)}</span>` : ""}<span>Decided by ${esc(c.decided_by || "pending")}</span></div>
+        ${c.resolution ? `<div><b>${esc(RESOLUTION[c.resolution] || c.resolution)}</b></div>` : ""}
+        <p class="msg">${esc(c.customer_message || c.summary || "")}</p>
+      </div>
+      <div class="section"><h3>Why</h3>
+        <ul class="plain">${(d.reasons || [c.summary]).filter(Boolean).map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+        ${(d.notes || []).length ? `<p class="hint">${d.notes.map(esc).join(" ")}</p>` : ""}
+      </div>
+      <div class="section"><h3>Policy used</h3>${clauses || `<p class="hint">No clauses cited.</p>`}</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>What the agent did</h2>
+    <ol class="steps">${steps || "<li>No steps recorded.</li>"}</ol>
+  </div>
+  <div class="panel">
+    <h2>Staff review</h2>
+    <div class="review">
+      <label for="note" style="margin:0">Note (optional)</label>
+      <textarea id="note" maxlength="500"></textarea>
+      <label for="vf" style="margin:0">Was the photo analysis right?</label>
+      <select id="vf">
+        <option value="">Not sure</option>
+        <option value="correct">Yes, it was right</option>
+        <option value="false_positive">No, it marked damage that isn’t there</option>
+        <option value="missed_defect">No, it missed real damage</option>
+      </select>
+      <div class="row"><button class="btn ok" data-act="approve">Approve return</button><button class="btn bad" data-act="reject">Reject return</button></div>
+      <div id="reviewError" role="alert"></div>
+    </div>
+    <div class="section"><h3>History</h3><ul class="hist">${hist}</ul></div>
+  </div>`;
+  document.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => review(c.id, b.dataset.act)));
+  loadCases();
+}
+
+async function review(id, action) {
+  $("reviewError").innerHTML = "";
+  try {
+    const c = await api(`/api/cases/${id}/review`, {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({action, note: $("note").value, vision_feedback: $("vf").value || null})});
+    showCase(c);
+  } catch (e) { $("reviewError").innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+}
+
+init();
+</script>
+</body>
+</html>

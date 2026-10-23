@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# OS and editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Model weights and generated outputs
+*.pt
+*.pth
+*.onnx
+*.safetensors
+outputs/
