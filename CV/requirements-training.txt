@@ -1,0 +1,6 @@
+# CV model training dependencies (install with the selected project venv)
+ultralytics>=8.3
+
+# Notebook demo (CV/defect_check.ipynb)
+ipykernel
+ipywidgets
