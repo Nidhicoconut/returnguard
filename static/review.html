@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review queue · ReturnGuard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+/* Reviewer desktop screens (wireframes S4 Review Queue and S5 Case Evidence Pack). */
+.bar { padding: 12px 28px; }
+.page { max-width: 1240px; margin: 0 auto; padding: 24px 28px 48px; display: grid; gap: 18px; }
+@media (max-width: 700px) { .page { padding: 16px; } .bar { padding: 12px 16px; } }
+.head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.head h2 { font-size: 24px; font-weight: 800; }
+.head .grow { flex: 1; }
+
+/* queue */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.stat { text-align: left; border: 0; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; cursor: pointer;
+        display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; border-top: 4px solid transparent; transition: transform .15s; }
+.stat:hover { transform: translateY(-1px); }
+.stat .n { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat .l { grid-column: 1 / -1; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.stat .ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; grid-row: 1; grid-column: 2; }
+.stat[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--navy-3), var(--shadow); }
+.stat.all { border-top-color: var(--navy-3); } .stat.all .ic { background: var(--info-bg); color: var(--info); }
+.stat.esc { border-top-color: var(--bad-btn); } .stat.esc .ic { background: var(--bad-bg); color: var(--bad); }
+.stat.pho { border-top-color: var(--warn-btn); } .stat.pho .ic { background: var(--warn-bg); color: var(--warn); }
+.stat.flg { border-top-color: var(--coral); } .stat.flg .ic { background: var(--coral-soft); color: #d4532f; }
+.stat.dec { border-top-color: var(--ok-btn); } .stat.dec .ic { background: var(--ok-bg); color: var(--ok); }
+.tablecard { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font-size: 11.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding: 14px 14px; background: var(--card); white-space: nowrap; }
+td { padding: 12px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+th:first-child, td:first-child { padding-left: 22px; } th:last-child, td:last-child { padding-right: 22px; }
+tbody tr { cursor: pointer; transition: background .12s; } tbody tr:hover td { background: #f8f9fc; }
+td.case { display: flex; align-items: center; gap: 12px; }
+td.case img, td.case .ph { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; background: #e3e8f1; flex: none; }
+td.case b { display: block; font-family: var(--mono); font-size: 13px; }
+td.case span.s { font-size: 12.5px; color: var(--ink-3); }
+.empty { padding: 48px 24px; text-align: center; color: var(--ink-2); }
+
+/* evidence pack */
+.casehead { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.backdark { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line-2); background: #fff; display: grid; place-items: center; cursor: pointer; color: var(--navy); box-shadow: var(--shadow); transition: transform .15s; }
+.backdark:hover { transform: translateX(-2px); }
+.backdark svg { width: 18px; height: 18px; stroke-width: 2.4; }
+.casehead h2 { font-size: 24px; font-weight: 800; }
+.casehead .sub { color: var(--ink-2); font-size: 14px; }
+.reco { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border-radius: 999px; padding: 6px 8px 6px 14px; box-shadow: var(--shadow); font-size: 13px; color: var(--ink-2); }
+.pack { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 920px) { .pack { grid-template-columns: 1fr; } .reco { margin-left: 0; } }
+.viewer { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 14px; }
+.toolbar { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-2); margin-bottom: 10px; flex-wrap: wrap; }
+.toolbar .count { font-weight: 700; color: var(--ink); margin-right: 6px; }
+.tool { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: #fff; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; text-decoration: none; }
+.tool[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.tool svg { width: 14px; height: 14px; }
+.stage { background: repeating-conic-gradient(#eef1f6 0% 25%, #f6f8fb 0% 50%) 50% / 20px 20px; border-radius: 12px; display: flex; justify-content: center; padding: 8px; }
+.stage .inner { position: relative; display: inline-block; line-height: 0; }
+.stage .inner img { max-height: 520px; width: auto; max-width: 100%; border-radius: 8px; }
+.thumbs { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.thumb { width: 62px; height: 62px; border-radius: 12px; border: 2px solid transparent; background: #e3e8f1; padding: 0; overflow: hidden; cursor: pointer; position: relative; box-shadow: var(--shadow); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb[aria-current="true"] { border-color: var(--coral); }
+.thumb .q { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--warn-btn); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.side { display: grid; gap: 12px; }
+.sec { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; font-size: 14px; }
+.sec .label { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.sec .label svg { width: 15px; height: 15px; }
+.sec p { margin: 3px 0 0; }
+.sec ul { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.kv { color: var(--ink-2); }
+.quote { color: var(--ink-2); font-style: italic; border-left: 3px solid var(--line-2); padding-left: 10px; margin-top: 8px !important; }
+.flag { color: var(--bad); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); }
+details.clause { border-top: 1px solid var(--line); padding: 7px 0 2px; }
+details.clause:first-of-type { border-top: 0; }
+details.clause summary { cursor: pointer; font-weight: 600; }
+.recbox { background: linear-gradient(135deg, #fff7e2, #fff2d0); border: 1px solid #f3d384; }
+.recbox .label { color: #8a5d00; }
+.trace { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.node { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: var(--info-bg); color: var(--info); }
+.node.err { background: var(--bad-bg); color: var(--bad); }
+.node .ms { font-family: var(--mono); font-weight: 500; opacity: .75; font-size: 11px; }
+.sep { color: var(--ink-3); }
+.trace summary { cursor: pointer; font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+.calls { width: 100%; margin-top: 8px; font-size: 12px; }
+.calls td, .calls th { padding: 6px 8px; } .calls td:first-child, .calls th:first-child { padding-left: 8px; }
+.calls pre { margin: 0; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; font-size: 11px; font-family: var(--mono); }
+.decide { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 18px; display: grid; gap: 14px; }
+.decide .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.decide .btn[aria-pressed="true"] { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--navy); }
+.form { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+@media (max-width: 700px) { .form { grid-template-columns: 1fr; } }
+.form .full { grid-column: 1 / -1; }
+.form label { margin: 6px 0 5px; }
+.done { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--ok-bg); color: #0d5c3e; font-size: 14px; }
+.done.rej { background: #eceff4; color: var(--ink); }
+.history { font-size: 13px; color: var(--ink-2); }
+.history ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+</style>
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<div class="page" id="page"></div>
+<script src="/static/app.js"></script>
+<script>
+let me = null, filter = "all", pollTimer = null, current = null, photoIdx = 0, showBoxes = true, action = null;
+const STATS = [["all", "All cases", "total", "search"], ["escalated", "Escalated", "escalated", "alert"],
+               ["photos", "Waiting for photos", "photos", "camera"], ["flagged", "Integrity flags", "flagged", "flag"], ["decided", "Decided", "decided", "check"]];
+const STAT_CLS = {all: "all", escalated: "esc", photos: "pho", flagged: "flg", decided: "dec"};
+const PRIORITY = {High: "bad", Medium: "warn", Low: "mute"};
+const TOOL_SHORT = {lookup_order: "T0 Order", parse_claim: "Claim", assess_photos: "T1 Quality · T7 Integrity",
+  detect_defects: "T4 Detect", verify_with_vlm: "T9 Vision check", retrieve_policy: "T8 Policy", create_ticket: "T10 Ticket"};
+
+function bar() {
+  $("bar").innerHTML = `${brand()}<span class="meta" style="margin-left:6px">Review desk</span><span class="grow"></span>
+    <span class="userchip"><span class="avatar-sm">${esc(initials(me.name))}</span>${esc(me.name)}</span>
+    <button class="signout" type="button" onclick="logout()">${icon("logout")} Sign out</button>`;
+}
+
+function route() {
+  clearTimeout(pollTimer);
+  const m = (location.hash || "").match(/^#case-(\d+)$/);
+  return m ? showCase(+m[1]) : showQueue();
+}
+window.addEventListener("hashchange", route);
+
+/* ---------- S4 review queue ---------- */
+async function showQueue() {
+  document.title = "Review queue · ReturnGuard";
+  const q = await api(`/api/review/queue?filter=${filter}`);
+  const n = q.counts;
+  $("page").innerHTML = `
+    <div class="head"><h2>Review queue</h2><span class="grow"></span><span class="muted small">Sorted by priority · refreshes every 10 s</span></div>
+    <div class="stats" role="group" aria-label="Filter cases">${STATS.map(([k, l, key, ic]) => `
+      <button class="stat ${STAT_CLS[k]}" type="button" data-f="${k}" aria-pressed="${k === filter}">
+        <span class="n">${n[key]}</span><span class="ic">${icon(ic)}</span><span class="l">${l}</span></button>`).join("")}</div>
+    <div class="tablecard"><div class="tablewrap"><table>
+      <thead><tr><th>Case</th><th>Garment</th><th>Reason</th><th>Recommended</th><th>Priority</th><th>Status</th></tr></thead>
+      <tbody>${q.cases.map((c) => {
+        const [cls, label] = DECISION_PILL[c.decision] || ["info", "Checking"];
+        return `<tr data-id="${c.id}" tabindex="0">
+          <td class="case">${c.thumb ? `<img src="${esc(c.thumb)}" alt="">` : `<span class="ph"></span>`}
+            <span><b>#C-${c.id}</b><span class="s">${esc(c.customer || "")} · ${esc(c.created_at.slice(5, 16).replace("T", " "))}</span></span></td>
+          <td>${esc(c.product || c.order_id)}</td>
+          <td>${esc(c.reason)}${c.flagged ? ` <span class="pill bad" title="Photo integrity flag">flag</span>` : ""}</td>
+          <td><span class="pill ${cls}">${esc(label)}</span></td>
+          <td><span class="pill ${PRIORITY[c.priority]}">${esc(c.priority)}</span></td>
+          <td><span class="pill ${STATUS_PILL[c.status] || "mute"}">${esc(c.status)}</span></td></tr>`;
+      }).join("")}</tbody></table></div>
+      ${q.cases.length ? "" : `<div class="empty">No cases here yet.</div>`}</div>`;
+  $("page").querySelectorAll(".stat").forEach((b) => b.onclick = () => { filter = b.dataset.f; showQueue(); });
+  $("page").querySelectorAll("tbody tr").forEach((tr) => {
+    const open = () => { location.hash = "#case-" + tr.dataset.id; };
+    tr.onclick = open; tr.onkeydown = (e) => { if (e.key === "Enter") open(); };
+  });
+  pollTimer = setTimeout(showQueue, 10000);
+}
+
+/* ---------- S5 case evidence pack ---------- */
+function regionsFor(c, photo) {
+  if (c.vision && c.vision.media_id === photo.id) return c.vision.regions || [];
+  const p = ((c.decision_detail || {}).per_photo || []).find((x) => x.media_id === photo.id);
+  return p ? p.regions || [] : [];
+}
+
+function findings(c) {
+  const out = [], v = c.vision, idx = (id) => c.photos.findIndex((p) => p.id === id) + 1;
+  if (v) {
+    if (v.verdict === "damaged" || v.verdict === "unsure")
+      out.push(`<b>${esc(v.defect_type || "damage")}</b> on img ${idx(v.media_id)}, score <span class="mono">${Number(v.damage_score ?? v.confidence).toFixed(2)}</span>${v.verdict === "unsure" ? " (weak)" : ""}${v.mode === "tiles" ? ", found zoomed in" : ""}`);
+    else if (v.verdict === "clean") out.push("Detector found no damage");
+    else if (v.verdict === "no_garment") out.push("No garment found in the photos");
+  }
+  const vc = c.vlm;
+  if (vc) {
+    if (vc.status === "damage_seen") out.push(`Vision check (blind) sees <b>${esc((vc.types_seen || []).join(", "))}</b>${vc.matches_claim === false ? " (not what was claimed)" : ""}`);
+    else if (vc.status === "no_damage_seen") out.push("Vision check (blind) sees no damage");
+    else if (vc.status === "unavailable") out.push("Vision check not run (no Gemini key)");
+    else if (vc.status === "failed") out.push(`<span class="flag">Vision check failed</span>: ${esc((vc.errors || [])[0] || "")}`);
+    for (const o of vc.observations || []) out.push(`<span class="kv">“${esc(o.description)}”</span>`);
+  }
+  if (!vc && v && (v.verdict === "damaged" || v.verdict === "unsure")) out.push('<span class="kv">Vision check (T9) did not run: no Gemini key set</span>');
+  const pre = c.preanalysis;
+  if (pre) {
+    pre.photos.forEach((p, i) => { if (!p.ok) out.push(`img ${i + 1}: ${esc(p.problems.join(", ").replace(/_/g, " "))}`); });
+    for (const f of pre.integrity_flags || []) out.push(`<span class="flag">${esc(f)}</span>`);
+  }
+  return out;
+}
+
+async function showCase(id) {
+  let c;
+  try { c = await api(`/api/cases/${id}`); } catch (err) { $("page").innerHTML = `<div class="empty">${esc(err.message)}</div>`; return; }
+  if (!current || current.id !== id) { photoIdx = Math.max(0, c.photos.findIndex((p) => c.vision && p.id === c.vision.media_id)); action = null; }
+  current = c;
+  document.title = `Case #C-${c.id} · ReturnGuard`;
+  const [cls, label] = DECISION_PILL[c.decision] || ["info", "Checking"];
+  const o = c.order, claim = c.parsed_claim || {}, d = c.decision_detail || {};
+  const photo = c.photos[photoIdx] || c.photos[0];
+  const decided = c.status === "Approved" || c.status === "Rejected";
+  const lastReview = c.reviews[c.reviews.length - 1];
+  $("page").innerHTML = `
+    <div class="casehead">
+      <button class="backdark" type="button" aria-label="Back to the review queue" onclick="location.hash=''">${icon("back")}</button>
+      <div><h2>Case <span class="mono">#C-${c.id}</span></h2><div class="sub">${esc(o ? o.customer : "")} · ${esc(o ? o.product : c.order_id)} · ${esc(c.created_at.replace("T", " "))}</div></div>
+      <span class="pill ${STATUS_PILL[c.status] || "mute"}">${esc(c.status)}</span>
+      <span class="reco">Recommendation <span class="pill ${cls}">${esc(label)}</span>${c.reason_label ? `<span>${esc(c.reason_label)}</span>` : ""}</span>
+    </div>
+    ${decided ? `<div class="done ${c.status === "Rejected" ? "rej" : ""}">${icon(c.status === "Approved" ? "check" : "info")}<span><b>${esc(c.status)}</b> by ${esc(c.decided_by || "")}${lastReview ? ` · ${esc(lastReview.reason_code)}${lastReview.note ? ` · “${esc(lastReview.note)}”` : ""}` : ""}. You can still change the decision below.</span></div>` : ""}
+    <div class="pack">
+      <div class="viewer">
+        <div class="toolbar"><span class="count">Image ${photoIdx + 1} / ${c.photos.length}</span>
+          <button class="tool" type="button" id="tboxes" aria-pressed="${showBoxes}">${icon("box")} Boxes</button>
+          ${photo ? `<a class="tool" href="${esc(photo.url)}" target="_blank" rel="noopener">${icon("zoom")} Full size</a>` : ""}
+          ${photo && photo.round ? `<span class="pill warn">Added later · request ${photo.round}</span>` : ""}
+          ${photo && photo.quality ? `<span class="small muted mono" style="margin-left:auto">${photo.quality.width}×${photo.quality.height} · sharpness ${Math.round(photo.quality.sharpness)}</span>` : ""}</div>
+        ${photo ? `<div class="stage${showBoxes ? "" : " nobox"} photo" style="border-radius:12px"><div class="inner"><img src="${esc(photo.url)}" alt="Customer photo ${photoIdx + 1}">${boxesHTML(regionsFor(c, photo))}</div></div>` : `<div class="empty">No photos.</div>`}
+        <div class="thumbs">${c.photos.map((p, i) => `<button class="thumb" type="button" data-i="${i}" aria-current="${i === photoIdx}" aria-label="Image ${i + 1}">
+          <img src="${esc(p.url)}" alt="">${(p.quality && !p.quality.ok) || ((p.integrity || {}).flags || []).length ? `<span class="q">!</span>` : ""}</button>`).join("")}</div>
+      </div>
+      <div class="side">
+        ${c.recommendation ? `<div class="sec recbox"><div class="label">${icon("info")} For the reviewer</div><p>${esc(c.recommendation)}</p></div>` : ""}
+        <div class="sec"><div class="label">${icon("user")} Claim</div>
+          <div class="chips"><span class="chip">${esc((claim.defect_type || "no damage described").replace(/_/g, " "))}</span>
+            ${claim.location ? `<span class="chip">${esc(claim.location)}</span>` : ""}
+            <span class="chip">${esc((claim.timing || "unknown").replace(/_/g, " "))}</span>
+            <span class="chip">wants ${esc(claim.requested_resolution || "unspecified")}</span></div>
+          <p class="quote">${esc(c.reason)}</p></div>
+        <div class="sec"><div class="label">${icon("search")} Findings</div><ul>${findings(c).map((f) => `<li>${f}</li>`).join("") || "<li>None yet</li>"}</ul></div>
+        <div class="sec"><div class="label">${icon("tag")} Order</div>
+          ${o ? `<p><b>${esc(o.product)}</b> · ${rupees(o.price)} · <span class="mono small">${esc(o.order_id)}</span></p>
+          <p class="kv">Delivered ${o.days_since_delivery} days ago · ${o.window_ok ? "inside the return window" : `<span class="flag">outside the return window</span>`}</p>` : `<p class="flag">Order not found</p>`}</div>
+        <div class="sec"><div class="label">${icon("shield")} Policy</div>${(d.clauses || []).map((k) => `<details class="clause"><summary>${esc(k.id)} · ${esc(k.title)}</summary><p class="kv">${esc(k.text)}</p></details>`).join("") || "<p class='kv'>None cited</p>"}</div>
+      </div>
+    </div>
+    <div class="trace"><div class="label">Agent trace${d.source ? ` · decided via ${esc(d.source)}` : ""}</div>
+      <div class="chain">${c.tool_calls.map((t) => `<span class="node${t.error ? " err" : ""}">${esc(TOOL_SHORT[t.tool] || t.tool)}<span class="ms">${t.latency_ms} ms</span></span>`).join(`<span class="sep">→</span>`) || "<span class='muted small'>Not started</span>"}
+        ${c.tool_calls.length ? `<span class="sep">→</span><span class="node" style="background:var(--coral-soft);color:#c2482a">${esc(label)}</span>` : ""}</div>
+      <details><summary>Show every tool call and the step log</summary>
+        <table class="calls"><thead><tr><th>#</th><th>Tool</th><th>ms</th><th>Result</th></tr></thead><tbody>
+        ${c.tool_calls.map((t) => `<tr><td class="mono">${t.run_no}.${t.step_no}</td><td>${esc(t.tool)}${t.error ? `<br><span class="flag">${esc(t.error)}</span>` : ""}</td><td class="mono">${t.latency_ms}</td>
+          <td><pre>${esc(JSON.stringify(t.result, null, 1).slice(0, 1500))}</pre></td></tr>`).join("")}</tbody></table>
+        <p class="small">${(c.trace || []).map((s) => `<b>${esc(s.step)}</b>: ${esc(s.summary)}`).join("<br>")}</p></details>
+    </div>
+    <div class="decide">
+      <div class="label">Your decision</div>
+      <div class="btns" role="group" aria-label="Decision">
+        <button class="btn ok" type="button" data-a="approve" aria-pressed="${action === "approve"}">${icon("check")} Approve</button>
+        <button class="btn bad" type="button" data-a="reject" aria-pressed="${action === "reject"}">${icon("x")} Reject</button>
+        <button class="btn warn" type="button" data-a="request_info" aria-pressed="${action === "request_info"}">${icon("camera")} Request info</button>
+      </div>
+      <div class="form" id="decideform" ${action ? "" : "hidden"}>
+        <div><label for="reason">Reason code</label><select id="reason"></select></div>
+        <div><label for="vf">Was the photo analysis right?</label><select id="vf">
+          <option value="">Not sure</option><option value="correct">Yes</option>
+          <option value="false_positive">No, it marked damage that isn't there</option><option value="missed_defect">No, it missed real damage</option></select></div>
+        <div class="full" id="msgwrap" hidden><label for="msg">Message to the customer</label><textarea id="msg" maxlength="500" placeholder="For example: please send a close-up of the left cuff in daylight." style="min-height:70px"></textarea></div>
+        <div class="full"><label for="note">Internal note</label><textarea id="note" maxlength="1000" style="min-height:60px"></textarea></div>
+        <div class="full"><button class="btn" type="button" id="confirm">Confirm decision</button><div id="err" role="alert"></div></div>
+      </div>
+    </div>
+    <div class="sec history"><div class="label">History</div><ul>${c.events.map((e) => `<li><span class="mono small">${esc(e.ts.replace("T", " "))}</span> · ${esc(e.actor)} ${esc(e.action.replace(/_/g, " "))}${e.detail && e.detail.reason_code ? ` (${esc(e.detail.reason_code)})` : ""}</li>`).join("")}</ul></div>`;
+
+  $("tboxes").onclick = () => { showBoxes = !showBoxes; showCase(id); };
+  $("page").querySelectorAll(".thumb").forEach((b) => b.onclick = () => { photoIdx = +b.dataset.i; showCase(id); });
+  $("page").querySelectorAll("[data-a]").forEach((b) => b.onclick = () => { action = b.dataset.a; showCase(id); });
+  if (action) {
+    $("reason").innerHTML = `<option value="">Select a reason</option>` + Object.entries(c.review_reasons[action]).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+    $("msgwrap").hidden = action !== "request_info";
+    $("confirm").onclick = () => submitReview(id);
+  }
+  if (c.status === "Checking") pollTimer = setTimeout(() => showCase(id), 2000);
+}
+
+async function submitReview(id) {
+  $("err").innerHTML = "";
+  if (!$("reason").value) { $("err").innerHTML = `<div class="error">Choose a reason code.</div>`; return; }
+  $("confirm").disabled = true;
+  try {
+    await postJSON(`/api/cases/${id}/review`, {action, reason_code: $("reason").value, note: $("note").value,
+      message: $("msg").value, vision_feedback: $("vf").value || null});
+    action = null; showCase(id);
+  } catch (err) { $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`; $("confirm").disabled = false; }
+}
+
+(async () => {
+  me = await api("/api/me");
+  if (me.role !== "reviewer") { location.href = "/customer"; return; }
+  bar();
+  route();
+})();
+</script>
+</body>
+</html>

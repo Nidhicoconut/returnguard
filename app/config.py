@@ -24,19 +24,70 @@ DB_PATH = DATA_DIR / "returnguard.db"
 POLICY_DIR = BASE_DIR / "policy"
 STATIC_DIR = BASE_DIR / "static"
 
-# Business rules (these are enforced in code, not left to the LLM)
-RETURN_WINDOW_DAYS = int(os.getenv("RETURN_WINDOW_DAYS", "30"))
-HUMAN_APPROVAL_ABOVE = float(os.getenv("HUMAN_APPROVAL_ABOVE", "10000"))  # INR
-NON_RETURNABLE_CATEGORIES = {"personal care", "software", "gift cards"}
+# Business rules (enforced in code, not left to the LLM). Defaults follow the project plan
+# (10-day window, ₹5,000 auto-approve cap); both still need mentor confirmation.
+RETURN_WINDOW_DAYS = int(os.getenv("RETURN_WINDOW_DAYS", "10"))
+AUTO_APPROVE_MAX_PRICE = float(os.getenv("AUTO_APPROVE_MAX_PRICE", "5000"))  # INR
+NON_RETURNABLE_TYPES = {"innerwear", "swimwear", "socks", "customised"}
+# Late returns are declined without a reviewer (the customer can still appeal). The project plan says
+# "never auto-reject"; set to 0 to send late returns to a reviewer instead.
+AUTO_REJECT_OUTSIDE_WINDOW = os.getenv("AUTO_REJECT_OUTSIDE_WINDOW", "1").lower() in ("1", "true", "yes")
+MAX_EVIDENCE_ROUNDS = int(os.getenv("MAX_EVIDENCE_ROUNDS", "2"))  # "please send another photo" requests per case
 
-# Upload limits
+# Agent guardrails (project plan: max 8 tool calls / 120 s per case)
+MAX_TOOL_CALLS = int(os.getenv("MAX_TOOL_CALLS", "8"))
+CASE_TIME_LIMIT_S = int(os.getenv("CASE_TIME_LIMIT_S", "120"))
+# Run the agent inside the request instead of a background thread (tests use this)
+AGENT_INLINE = os.getenv("AGENT_INLINE", "0").lower() in ("1", "true", "yes")
+
+# Uploads
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+MAX_PHOTOS = 4
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
-# Vision / LLM selection
+# Image pre-analysis (quality gate and integrity checks)
+# Limits were checked on 244 good garment photos (real customer and test photos): about 1% fail.
+MIN_SIDE_PX = int(os.getenv("MIN_SIDE_PX", "200"))
+MIN_SHARPNESS = float(os.getenv("MIN_SHARPNESS", "30"))  # variance of the Laplacian at 640 px
+DARK_MEAN, BRIGHT_MEAN = 25, 240                          # mean grey level limits (0-255)
+DUPLICATE_HASH_BITS = 10                                  # of 256 dHash bits; same photo re-saved: <= 8
+# OpenCV YuNet face detector, used to blur faces before a photo is sent to the external vision model
+FACE_MODEL = Path(os.getenv("FACE_MODEL", BASE_DIR / "weights" / "face_detection_yunet_2023mar.onnx"))
+
+# Accounts and sessions
+SESSION_DAYS = int(os.getenv("SESSION_DAYS", "7"))
+SHOW_DEMO_ACCOUNTS = os.getenv("SHOW_DEMO_ACCOUNTS", "1").lower() in ("1", "true", "yes")
+
+# Vision: everything is clothing for now. The trained models come from CV/ (see CV/README.md);
+# without the weights the app falls back to VISION_BACKEND (CLIP or the OpenCV heuristic).
 VISION_BACKEND = os.getenv("VISION_BACKEND", "auto").lower()
 CLIP_MODEL = os.getenv("CLIP_MODEL", "openai/clip-vit-base-patch32")
+CV_DIR = BASE_DIR / "CV"
+CLOTHES_MODEL = os.getenv("CLOTHES_MODEL", "auto").lower()
+CLOTHING_CATEGORIES = {"clothing", "apparel", "clothes"}
+CLOTHES_DETECTOR = Path(os.getenv("CLOTHES_DETECTOR", CV_DIR / "runs" / "deploy" / "clothes_damage_detector.pt"))
+CLOTHES_LOCATOR = Path(os.getenv("CLOTHES_LOCATOR", CV_DIR / "runs" / "deploy" / "clothes_damage_locator.pt"))
+CLOTHES_DEVICE = os.getenv("CLOTHES_DEVICE", "auto").lower()  # auto | cpu | 0 (first GPU)
+# Grounding DINO second opinion: ~700 MB model, slow on CPU. Needs CV/.pydeps (transformers).
+CLOTHES_SECOND_OPINION = os.getenv("CLOTHES_SECOND_OPINION", "0").lower() in ("1", "true", "yes")
+# Boxes shown to reviewers and sent to the vision check (the damaged/clean verdict does not use these):
+# real defects are small, so boxes over a fifth of the photo are dropped; scores below STRONG are drawn as weak hints.
+REGION_MAX_AREA = float(os.getenv("REGION_MAX_AREA", "0.2"))
+REGION_MIN_SCORE = float(os.getenv("REGION_MIN_SCORE", "0.25"))
+REGION_STRONG_SCORE = float(os.getenv("REGION_STRONG_SCORE", "0.3"))
+
+# Text LLM (claim parsing and report wording)
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").lower()
 LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-5-5")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "").rstrip("/")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "llama3.1")
+
+# Vision-language check of damage crops (tool T9). Gemini through its OpenAI-compatible endpoint.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+VLM_BASE_URL = os.getenv("VLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
+VLM_MODEL = os.getenv("VLM_MODEL", "gemini-2.5-flash")
+VLM_MAX_CALLS = int(os.getenv("VLM_MAX_CALLS", "3"))  # per case
+# "none" turns off Gemini 2.5 Flash thinking (faster, and the reply is not cut short). Empty = model default.
+VLM_REASONING_EFFORT = os.getenv("VLM_REASONING_EFFORT", "none")
+# The plan only auto-approves a defect when the VLM confirms it. Set to 0 to allow detector-only approval.
+REQUIRE_VLM_FOR_APPROVAL = os.getenv("REQUIRE_VLM_FOR_APPROVAL", "1").lower() in ("1", "true", "yes")

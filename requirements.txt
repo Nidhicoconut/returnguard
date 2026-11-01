@@ -21,5 +21,8 @@ mcp>=1.2
 # torch
 # transformers
 
+# Optional: trained clothing-defect models (CV/runs/deploy); installs torch
+# ultralytics>=8.3
+
 # Dev
 pytest>=8.0

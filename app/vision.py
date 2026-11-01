@@ -1,6 +1,10 @@
 """Vision evidence: decide whether a product photo shows a defect, and where.
 
-Two interchangeable backends return the same structure:
+Three backends return the same structure. Clothing orders use the trained clothes model when its
+weights exist; everything else uses heuristic or clip:
+
+* clothes-yolo - two YOLO models trained on garment photos (hole, stain), from CV/scripts/predict.py.
+                 Needs ultralytics and the weights in CV/runs/deploy.
 
 * heuristic  - classical CV (Otsu thresholding, morphology, local colour/contrast anomaly,
                connected components). No model download, runs anywhere. Great on clean photos,
@@ -233,15 +237,141 @@ def active_backend() -> str:
     return "clip" if clip_available() else "heuristic"
 
 
-def analyze(path, backend: str | None = None) -> dict:
+# --------------------------------------------------------------------------- clothes backend
+# Trained two-model YOLO predictor from CV/scripts/predict.py (hole and stain on garments).
+CLOTHES_LABELS = {"damaged": "defective", "unsure": "inconclusive", "clean": "intact", "no_garment": "inconclusive"}
+VERDICT_FROM_LABEL = {"defective": "damaged", "inconclusive": "unsure", "intact": "clean"}
+VERDICT_RANK = {"damaged": 3, "unsure": 2, "clean": 1, "no_garment": 0}
+
+
+def _contained(inner: dict, outer: dict) -> float:
+    """Share of `inner`'s area that lies inside `outer` (boxes normalised 0-1)."""
+    w = min(inner["x"] + inner["w"], outer["x"] + outer["w"]) - max(inner["x"], outer["x"])
+    h = min(inner["y"] + inner["h"], outer["y"] + outer["h"]) - max(inner["y"], outer["y"])
+    return max(0.0, w) * max(0.0, h) / max(inner["w"] * inner["h"], 1e-9)
+
+
+def clean_regions(regions: list[dict]) -> list[dict]:
+    """Tidy the boxes shown to people and sent to the vision check (the damaged/clean verdict is unchanged).
+
+    On real photos the model often adds very large, low-scoring boxes over half a sleeve while the real
+    hole gets a small box with a lower score, so a higher score cut-off would hide the wrong one. Instead:
+    drop boxes covering more than REGION_MAX_AREA of the photo, drop boxes mostly inside a stronger one,
+    and keep boxes from REGION_MIN_SCORE up. If only weaker boxes are left, keep the best one marked as weak.
+    If every box is oversized, none is kept (the vision check then looks at the whole photo).
+    """
+    ordered = sorted(regions, key=lambda r: r["score"], reverse=True)
+    sized = [r for r in ordered if r["w"] * r["h"] <= config.REGION_MAX_AREA]
+    kept = []
+    for r in sized:
+        if all(_contained(r, k) < 0.6 for k in kept):
+            kept.append(r)
+    strong = [r for r in kept if r["score"] >= config.REGION_MIN_SCORE]
+    out = strong or kept[:1]
+    return [{**r, "weak": r["score"] < config.REGION_STRONG_SCORE} for r in out[:5]]
+
+
+class ClothesBackend:
+    def __init__(self):
+        import importlib.util
+        import os
+        import sys
+
+        if config.CLOTHES_SECOND_OPINION:  # transformers lives in CV/.pydeps, apart from the app venv
+            os.environ.setdefault("HF_HOME", str(config.CV_DIR / ".hf_cache"))
+            sys.path.append(str(config.CV_DIR / ".pydeps"))
+        spec = importlib.util.spec_from_file_location("cv_predict", config.CV_DIR / "scripts" / "predict.py")
+        predict = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(predict)
+
+        device = config.CLOTHES_DEVICE
+        if device == "auto":
+            import torch
+            device = "0" if torch.cuda.is_available() else "cpu"
+        self.predictor = predict.DefectPredictor(config.CLOTHES_DETECTOR, config.CLOTHES_LOCATOR, device=device,
+                                                 second_opinion=config.CLOTHES_SECOND_OPINION)
+
+    def analyze(self, img, tiles: bool = False):
+        r = self._tiled(img) if tiles else self.predictor.predict(img)
+        score = r["damage_score"]
+        # The predictor's thresholds are low (damaged from 0.2), so map scores onto the 0.5-1 range the
+        # decision rules expect; unsure and no-garment photos always go to a human.
+        conf = {"damaged": 0.5 + score / 2, "clean": 1 - score}.get(r["verdict"], score)
+        regions = clean_regions([{k: reg[k] for k in ("x", "y", "w", "h", "score", "type")} for reg in r["regions"]])
+        return {"backend": "clothes-yolo", "mode": "tiles" if tiles else "full", "verdict": r["verdict"],
+                "label": CLOTHES_LABELS[r["verdict"]], "confidence": round(float(conf), 3),
+                "damage_score": score, "detector_score": r["detector_score"], "locator_score": r["locator_score"],
+                "garment_found": r["garment_score"] is not None or tiles and r.get("garment_found", False),
+                "defect_type": r["defect_type"], "regions": regions, "note": r["note"]}
+
+    def _tiled(self, img):
+        """Retry at higher zoom: run the predictor on four overlapping quarters of the photo and map the
+        regions back. Used when the first pass is unsure or the claim and the first pass disagree."""
+        h, w = img.shape[:2]
+        tw, th = int(w * 0.6), int(h * 0.6)
+        best, regions, garment = None, [], False
+        for x0 in (0, w - tw):
+            for y0 in (0, h - th):
+                r = self.predictor.predict(img[y0:y0 + th, x0:x0 + tw])
+                garment = garment or r["garment_score"] is not None
+                for reg in r["regions"]:
+                    regions.append({**reg, "x": (x0 + reg["x"] * tw) / w, "y": (y0 + reg["y"] * th) / h,
+                                    "w": reg["w"] * tw / w, "h": reg["h"] * th / h})
+                if best is None or (VERDICT_RANK[r["verdict"]], r["damage_score"]) > (VERDICT_RANK[best["verdict"]], best["damage_score"]):
+                    best = r
+        regions.sort(key=lambda reg: reg["score"], reverse=True)
+        verdict = best["verdict"] if best["verdict"] != "no_garment" or not garment else "clean"
+        return {**best, "verdict": verdict, "regions": regions[:15], "garment_found": garment,
+                "defect_type": regions[0]["type"] if regions and verdict in ("damaged", "unsure") else None}
+
+
+@lru_cache(maxsize=1)
+def _clothes():
+    return ClothesBackend()
+
+
+def clothes_available() -> bool:
+    if config.CLOTHES_MODEL == "off" or not config.CLOTHES_DETECTOR.is_file():
+        return False
+    try:
+        import ultralytics  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def uses_clothes_model(category: str | None) -> bool:
+    return (category or "").lower() in config.CLOTHING_CATEGORIES and clothes_available()
+
+
+def _with_verdict(out: dict) -> dict:
+    """Give heuristic/CLIP results the same fields as the clothes model."""
+    out.setdefault("verdict", VERDICT_FROM_LABEL.get(out["label"], "unsure"))
+    out.setdefault("garment_found", True)
+    out.setdefault("mode", "full")
+    return out
+
+
+def analyze(path, backend: str | None = None, category: str | None = None, tiles: bool = False) -> dict:
+    if backend in (None, "clothes") and uses_clothes_model(category):
+        img = cv2.imread(str(path), cv2.IMREAD_COLOR)  # full resolution: the predictor zooms into the garment
+        if img is None:
+            raise ValueError("Could not read the image file")
+        try:
+            return _clothes().analyze(img, tiles=tiles)
+        except Exception as exc:
+            log.warning("Clothes model failed (%s); falling back to %s backend", exc, active_backend())
+            out = analyze(path, backend=active_backend())
+            out["note"] = f"Clothes model unavailable ({type(exc).__name__}). " + out["note"]
+            return out
     img = _load(path)
     backend = backend or active_backend()
     if backend == "clip":
         try:
-            return _clip().analyze(img)
+            return _with_verdict(_clip().analyze(img))
         except Exception as exc:  # model download blocked, out of memory, ...
             log.warning("CLIP failed (%s); falling back to heuristic backend", exc)
             out = analyze_heuristic(img)
             out["note"] = f"CLIP unavailable ({type(exc).__name__}); used classical CV. " + out["note"]
-            return out
-    return analyze_heuristic(img)
+            return _with_verdict(out)
+    return _with_verdict(analyze_heuristic(img))

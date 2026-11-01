@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My returns · ReturnGuard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+/* Customer screens (wireframes S2 and S3): a phone-width app; on a wide screen it floats as a card. */
+.phone { max-width: 460px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+@media (min-width: 520px) { body { background: linear-gradient(180deg, var(--navy) 0, var(--navy) 220px, var(--bg) 220px); }
+  .phone { margin: 28px auto; min-height: calc(100vh - 56px); border-radius: 26px; overflow: hidden; box-shadow: var(--shadow-lg); } }
+.bar { gap: 10px; }
+.bar h1 { flex: 1; text-align: center; font-size: 16px; }
+.bar .left, .bar .right { width: 92px; display: flex; align-items: center; }
+.bar .right { justify-content: flex-end; }
+.iconbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.iconbtn:hover { background: rgba(255,255,255,.2); }
+main { padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+/* home */
+.hero { position: relative; overflow: hidden; border-radius: 20px; padding: 22px 20px; color: #fff;
+        background: linear-gradient(135deg, var(--navy-2), var(--navy)); box-shadow: var(--shadow); }
+.hero::after { content: ""; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(255,122,89,.55), rgba(255,122,89,0) 70%); }
+.hero h2 { font-size: 22px; font-weight: 800; position: relative; }
+.hero p { margin: 6px 0 16px; color: #c9d3ea; font-size: 14px; position: relative; max-width: 30ch; }
+.hero .btn { position: relative; }
+.section-title { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ret { width: 100%; text-align: left; display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center;
+       background: var(--surface); border: 0; border-radius: 16px; padding: 10px 12px 10px 10px; cursor: pointer; box-shadow: var(--shadow); transition: transform .15s; }
+.ret:hover { transform: translateY(-1px); }
+.ret img, .ret .ph { width: 56px; height: 56px; object-fit: cover; border-radius: 12px; background: #e3e8f1; }
+.ret b { display: block; font-size: 15px; }
+.ret .r { display: grid; justify-items: end; gap: 6px; color: var(--ink-3); }
+.empty { text-align: center; padding: 34px 16px; color: var(--ink-2); background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); }
+.empty .em { width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%; background: var(--coral-soft); color: var(--coral); display: grid; place-items: center; }
+
+/* new return */
+.panel { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
+.panel > label:first-child { margin-top: 0; }
+.orders { display: grid; gap: 8px; }
+.order { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 12px; border: 1.5px solid var(--line); border-radius: 14px; cursor: pointer; transition: border-color .15s, background .15s; }
+.order:hover { border-color: var(--line-2); }
+.order input { accent-color: var(--coral); width: 18px; height: 18px; margin: 0; }
+.order:has(input:checked) { border-color: var(--coral); background: #fffaf8; box-shadow: 0 0 0 3px var(--coral-soft); }
+.order b { display: block; font-size: 14.5px; }
+.order .price { font-weight: 700; font-size: 14px; }
+.order .win { font-size: 12px; }
+.win.ok { color: var(--ok); } .win.late { color: var(--bad); }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.quick button { border: 1px solid var(--line-2); background: #fff; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.quick button:hover { border-color: var(--coral); color: var(--coral); }
+.counter { text-align: right; font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tile { position: relative; aspect-ratio: 1; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); overflow: hidden; display: grid; place-items: center; font-size: 13px; color: var(--ink-2); cursor: pointer; padding: 0; }
+.tile img { width: 100%; height: 100%; object-fit: cover; }
+.tile .x { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(15,22,40,.65); color: #fff; display: grid; place-items: center; }
+.tile .x svg { width: 13px; height: 13px; }
+.tile .q { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.tile .q.ok { background: var(--ok-bg); color: var(--ok); } .tile .q.bad { background: var(--warn-bg); color: var(--warn); }
+.tile.add { border: 1.5px dashed var(--line-2); background: #fff; color: var(--navy-3); display: grid; gap: 4px; align-content: center; justify-items: center; font-weight: 700; }
+.tile.add svg { width: 24px; height: 24px; }
+.tile.bad { border-color: var(--warn-btn); }
+.checks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; margin-top: 10px; }
+.checks .ok { color: var(--ok); } .checks .warn { color: var(--warn); }
+.tips { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; font-size: 13px; color: var(--ink-2); background: var(--info-bg); border-radius: 14px; padding: 12px; }
+.tips svg { color: var(--info); width: 20px; height: 20px; margin-top: 1px; }
+
+/* case screens */
+.stepper { display: grid; grid-template-columns: 1fr 1fr 1fr; position: relative; margin: 4px 6px 6px; }
+.stepper::before { content: ""; position: absolute; left: 16%; right: 16%; top: 13px; height: 3px; background: var(--line); border-radius: 3px; }
+.stepper .fill { position: absolute; left: 16%; top: 13px; height: 3px; background: var(--coral); border-radius: 3px; transition: width .4s; }
+.st { display: grid; justify-items: center; gap: 6px; position: relative; font-size: 12px; color: var(--ink-3); font-weight: 600; }
+.st .dot { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 3px solid var(--line); display: grid; place-items: center; font-size: 12px; color: var(--ink-3); }
+.st.done .dot { background: var(--coral); border-color: var(--coral); color: #fff; }
+.st.now .dot { border-color: var(--coral); color: var(--coral); }
+.st.done, .st.now { color: var(--ink); }
+.st .dot svg { width: 14px; height: 14px; stroke-width: 3; }
+.result { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 22px 18px; text-align: center; display: grid; gap: 8px; justify-items: center; }
+.badge { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; }
+.badge svg { width: 32px; height: 32px; stroke-width: 2.4; }
+.badge.ok { background: var(--ok-bg); color: var(--ok); box-shadow: 0 0 0 8px #f0faf5; }
+.badge.warn { background: var(--warn-bg); color: var(--warn-btn); box-shadow: 0 0 0 8px #fffaee; }
+.badge.info { background: var(--info-bg); color: var(--info); box-shadow: 0 0 0 8px #f3f6ff; }
+.badge.mute { background: #eceff4; color: var(--ink-2); box-shadow: 0 0 0 8px #f6f7fa; }
+.title { font-size: 21px; font-weight: 800; margin-top: 8px; }
+.title.ok { color: var(--ok); } .title.warn { color: #b07b00; }
+.lead { color: var(--ink-2); font-size: 14px; max-width: 34ch; margin: 0; }
+.card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
+.card .label { margin-bottom: 10px; }
+.card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 14px; }
+.card li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; }
+.mk { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+.mk svg { width: 13px; height: 13px; stroke-width: 3; }
+.mk.ok { background: var(--ok-bg); color: var(--ok); } .mk.warn { background: var(--warn-bg); color: var(--warn); } .mk.bad { background: var(--bad-bg); color: var(--bad); }
+.timeline li { position: relative; }
+.timeline li:not(:last-child)::after { content: ""; position: absolute; left: 10px; top: 24px; bottom: -9px; width: 2px; background: var(--line); }
+.mk.now { background: var(--info-bg); }
+.mk.now::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--info); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.6); opacity: .4; } }
+.ring { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; background: var(--info-bg); box-shadow: 0 0 0 8px #f3f6ff; }
+.ring .spin { width: 34px; height: 34px; border-width: 4px; }
+.note { border-radius: 16px; padding: 14px 16px; font-size: 14px; display: grid; grid-template-columns: 24px 1fr; gap: 10px; }
+.note svg { width: 20px; height: 20px; }
+.note.warn { background: var(--warn-box); border: 1px solid #f3d384; color: #6d4a00; }
+.note.ok { background: var(--ok-bg); color: #0d5c3e; }
+.note.info { background: var(--info-bg); color: #24438f; }
+.foot { text-align: center; font-size: 12.5px; color: var(--ink-3); }
+.mythumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.mythumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: 12px; box-shadow: var(--shadow); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <header class="bar">
+    <span class="left" id="left"></span>
+    <h1 id="title">My returns</h1>
+    <span class="right"><button class="iconbtn" id="logout" type="button" aria-label="Sign out" title="Sign out"></button></span>
+  </header>
+  <main id="view" aria-live="polite"></main>
+</div>
+<input type="file" id="picker" accept="image/jpeg,image/png,image/webp" multiple hidden>
+<script src="/static/app.js"></script>
+<script>
+let me = null, orders = [], cfg = {max_photos: 4, max_evidence_rounds: 2, return_window_days: 10}, pollTimer = null;
+let draft = [];          // [{file, url, check}] photos chosen on the New Return screen
+let pickerTarget = null; // "new" or a case id (evidence upload)
+
+const STEP_LABEL = {get_order: "Found your order", parse_claim: "Read your description", check_photos: "Checked photo quality",
+  detect_defects: "Looked for damage on the garment", zoom_in: "Took a closer look", verify_with_vlm: "Double-checked the damage",
+  retrieve_policy: "Checked the return policy", decide: "Reached a decision", finalize: "Finished"};
+const PROBLEM = {too_small: "too small", blurry: "blurry", too_dark: "too dark", too_bright: "too bright"};
+const QUICK = [["Hole or tear", "There is a hole in the fabric near the "], ["Stain", "There is a stain on the "],
+               ["Seam came apart", "The seam has split at the "], ["Changed my mind", "I changed my mind, the garment is unworn."]];
+
+$("logout").innerHTML = icon("logout");
+$("logout").onclick = logout;
+
+function setHeader(title, back) {
+  $("title").textContent = title;
+  $("left").innerHTML = back ? `<button class="back" type="button" aria-label="Back to my returns">${icon("back", "")}</button>` : brandMini();
+  if (back) $("left").firstChild.onclick = () => { location.hash = "#home"; };
+}
+const brandMini = () => `<span class="brand"><span class="tag">${icon("tag", "")}</span></span>`;
+
+function route() {
+  clearTimeout(pollTimer);
+  const h = location.hash || "#home";
+  if (h === "#new") return showNew();
+  const m = h.match(/^#case-(\d+)$/);
+  if (m) return showCase(+m[1]);
+  return showHome();
+}
+window.addEventListener("hashchange", route);
+
+/* ---------- home: my returns ---------- */
+async function showHome() {
+  setHeader("My returns", false);
+  const cases = await api("/api/cases");
+  $("view").innerHTML = `
+    <section class="hero rise">
+      <h2>Hi ${esc(me.name.split(" ")[0])}</h2>
+      <p>Something wrong with an order? Send a few photos and we'll usually decide in about a minute.</p>
+      <button class="btn coral" id="start" type="button">${icon("plus")} Start a new return</button>
+    </section>
+    <div class="section-title"><span class="label">Your returns</span><span class="small muted">${cases.length || ""}</span></div>
+    ${cases.length ? `<ul class="list">${cases.map((c) => `
+      <li class="rise"><button class="ret" type="button" data-id="${c.id}">
+        ${c.photos[0] ? `<img src="${esc(c.photos[0].url)}" alt="">` : `<span class="ph"></span>`}
+        <span><b>${esc(c.product || c.order_id)}</b><span class="small muted">Case #${c.id} · ${esc(c.created_at.slice(0, 10))}</span></span>
+        <span class="r"><span class="pill ${STATUS_PILL[c.status] || "mute"}">${esc(c.status)}</span></span>
+      </button></li>`).join("")}</ul>`
+    : `<div class="empty"><div class="em">${icon("tag")}</div>No returns yet.<br><span class="small">Start one when something is wrong with an order.</span></div>`}`;
+  $("start").onclick = () => { location.hash = "#new"; };
+  $("view").querySelectorAll(".ret").forEach((b) => b.onclick = () => { location.hash = "#case-" + b.dataset.id; });
+}
+
+/* ---------- S2: new return ---------- */
+function showNew() {
+  setHeader("New return", true);
+  draft = [];
+  const firstOk = (orders.find((o) => o.window_ok) || orders[0] || {}).order_id;
+  $("view").innerHTML = `
+    <form id="newform" novalidate class="rise" style="display:grid;gap:14px">
+      <section class="panel">
+        <label style="margin-top:0">Which order?</label>
+        <div class="orders" role="radiogroup" aria-label="Order">${orders.map((o) => {
+          const left = cfg.return_window_days - o.days_since_delivery;
+          return `<label class="order" style="margin:0;font-weight:400"><input type="radio" name="order" value="${esc(o.order_id)}" ${o.order_id === firstOk ? "checked" : ""}>
+            <span><b>${esc(o.product)}</b><span class="win ${o.window_ok ? "ok" : "late"}">${o.window_ok ? `${left} day${left === 1 ? "" : "s"} left to return` : "Past the return window"}</span>
+            <span class="small muted"> · ${esc(o.order_id)}</span></span>
+            <span class="price">${rupees(o.price)}</span></label>`;
+        }).join("")}</div>
+        <div class="note warn" id="latewarn" hidden style="margin-top:10px">${icon("alert")}<span>This order is past the ${cfg.return_window_days}-day return window, so the return will be declined automatically. You can still appeal it afterwards.</span></div>
+      </section>
+      <section class="panel">
+        <label for="reason" style="margin-top:0">What's wrong?</label>
+        <textarea id="reason" maxlength="1000" placeholder="For example: there is a hole near the collar, it was like this when I opened the package."></textarea>
+        <div class="counter" id="count">0 / 1000</div>
+        <div class="quick">${QUICK.map(([l, t], i) => `<button type="button" data-q="${i}">${esc(l)}</button>`).join("")}</div>
+      </section>
+      <section class="panel">
+        <label id="photoslabel" style="margin-top:0">Photos (0 of ${cfg.max_photos})</label>
+        <div class="photos" id="photos"></div>
+        <div class="checks" id="checks"></div>
+      </section>
+      <div class="tips">${icon("camera")}<span>Add one photo of the <b>whole garment</b> laid flat, and a <b>close-up</b> of any damage in good light.</span></div>
+      <button class="btn block coral" id="submit" type="submit">${icon("send")} Submit return</button>
+      <div id="err" role="alert"></div>
+    </form>`;
+  $("reason").oninput = () => { $("count").textContent = `${$("reason").value.length} / 1000`; };
+  const late = () => { const v = (document.querySelector("input[name=order]:checked") || {}).value;
+                       $("latewarn").hidden = !orders.some((o) => o.order_id === v && !o.window_ok); };
+  document.querySelectorAll("input[name=order]").forEach((r) => r.onchange = late); late();
+  $("view").querySelectorAll("[data-q]").forEach((b) => b.onclick = () => {
+    $("reason").value = QUICK[+b.dataset.q][1]; $("reason").focus(); $("reason").oninput();
+  });
+  renderDraft();
+  $("newform").addEventListener("submit", submitNew);
+}
+
+function renderDraft() {
+  $("photoslabel").textContent = `Photos (${draft.length} of ${cfg.max_photos})`;
+  $("photos").innerHTML = draft.map((d, i) => `
+    <button type="button" class="tile${d.check && !d.check.ok ? " bad" : ""}" data-i="${i}" aria-label="Remove photo ${i + 1}">
+      <img src="${d.url}" alt="Photo ${i + 1}"><span class="x">${icon("x", "")}</span>
+      ${d.check ? `<span class="q ${d.check.ok ? "ok" : "bad"}">${d.check.ok ? "OK" : "Retake"}</span>` : ""}</button>`).join("")
+    + (draft.length < cfg.max_photos ? `<button type="button" class="tile add" id="add">${icon("camera", "")}Add photo</button>` : "");
+  $("photos").querySelectorAll("[data-i]").forEach((b) => b.onclick = () => { draft.splice(+b.dataset.i, 1); renderDraft(); });
+  if ($("add")) $("add").onclick = () => { pickerTarget = "new"; $("picker").click(); };
+  $("checks").innerHTML = draft.map((d, i) => !d.check ? `<span class="muted">img ${i + 1} checking…</span>`
+    : d.check.ok ? `<span class="ok">✓ img ${i + 1} OK</span>`
+    : `<span class="warn">⚠ img ${i + 1} ${d.check.problems.map((p) => PROBLEM[p] || p).join(", ")} - retake</span>`).join("");
+}
+
+$("picker").addEventListener("change", async (e) => {
+  const files = [...e.target.files]; e.target.value = "";
+  if (pickerTarget === "new") {
+    for (const f of files.slice(0, cfg.max_photos - draft.length)) {
+      const d = {file: f, url: URL.createObjectURL(f), check: null};
+      draft.push(d); renderDraft();
+      const fd = new FormData(); fd.append("image", f);
+      api("/api/precheck", {method: "POST", body: fd}).then((q) => { d.check = q; renderDraft(); })
+        .catch((err) => { d.check = {ok: false, problems: [err.message]}; renderDraft(); });
+    }
+  } else if (pickerTarget) {
+    await sendEvidence(pickerTarget, files.slice(0, cfg.max_photos));
+  }
+});
+
+async function submitNew(e) {
+  e.preventDefault();
+  $("err").innerHTML = "";
+  const reason = $("reason").value.trim(), order = (document.querySelector("input[name=order]:checked") || {}).value;
+  if (!order) return $("err").innerHTML = `<div class="error">Choose an order.</div>`;
+  if (!reason) return $("err").innerHTML = `<div class="error">Describe what is wrong with the item.</div>`;
+  if (!draft.length) return $("err").innerHTML = `<div class="error">Add at least one photo.</div>`;
+  const fd = new FormData();
+  fd.append("order_id", order); fd.append("reason", reason);
+  draft.forEach((d) => fd.append("images", d.file));
+  $("submit").disabled = true;
+  try {
+    const c = await api("/api/cases", {method: "POST", body: fd});
+    location.hash = "#case-" + c.id;
+  } catch (err) {
+    $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`;
+  } finally { if ($("submit")) $("submit").disabled = false; }
+}
+
+/* ---------- S3: verifying and decision screens ---------- */
+function stepper(stage) {
+  const names = ["Submitted", "Verifying", "Decision"];
+  return `<div class="stepper"><span class="fill" style="width:${stage >= 3 ? 68 : stage === 2 ? 34 : 0}%"></span>${names.map((n, i) => {
+    const s = i + 1 < stage ? "done" : i + 1 === stage ? (stage === 3 ? "done" : "now") : "";
+    return `<div class="st ${s}"><span class="dot">${s === "done" ? icon("check", "i") : i + 1}</span>${n}</div>`;
+  }).join("")}</div>`;
+}
+const checkList = (checks) => checks.map((k) =>
+  `<li><span class="mk ${k.ok ? "ok" : "warn"}">${icon(k.ok ? "check" : "alert", "i")}</span><span>${esc(k.text)}</span></li>`).join("");
+
+async function showCase(id) {
+  setHeader(`Case #${id}`, true);
+  let c;
+  try { c = await api(`/api/cases/${id}`); } catch (err) { $("view").innerHTML = `<div class="error">${esc(err.message)}</div>`; return; }
+  const v = $("view");
+  if (c.status === "Checking") {
+    const done = c.steps.filter((s, i, a) => i >= a.map((x) => x.step).lastIndexOf("get_order"));
+    v.innerHTML = `${stepper(2)}
+      <section class="result"><div class="ring"><span class="spin" aria-hidden="true"></span></div>
+        <div class="title">Verifying your return</div>
+        <p class="lead">Our agent is checking your photos against your description. This usually takes under a minute.</p></section>
+      <section class="card"><div class="label">Agent steps</div><ul class="timeline">
+        ${done.map((s) => `<li><span class="mk ok">${icon("check", "i")}</span><span>${esc(STEP_LABEL[s.step] || s.step)}</span></li>`).join("")}
+        <li><span class="mk now"></span><span class="muted">Working…</span></li></ul></section>`;
+    pollTimer = setTimeout(() => showCase(id), 1200);
+    return;
+  }
+  const thumbs = c.photos.length ? `<div class="mythumbs">${c.photos.map((p) => `<img src="${esc(p.url)}" alt="Your photo">`).join("")}</div>` : "";
+  const product = esc(c.product || c.order_id);
+  if (c.status === "Approved") {
+    const res = c.resolution === "store_credit" ? "Store credit" : "Full refund or a free replacement";
+    v.innerHTML = `${stepper(3)}
+      <section class="result rise"><div class="badge ok">${icon("check", "i")}</div><div class="title ok">You're approved!</div>
+        <p class="lead">${esc(c.message || "")}</p></section>
+      <section class="card"><div class="label">What we found</div><ul>${checkList(c.checks)}</ul></section>
+      <div class="note ok">${icon("tag")}<span><b>${esc(res)}</b> for your ${product}.${c.decided_by === "reviewer" ? " Approved by our returns team." : ""}<br><span class="small">Ticket <span class="mono">${esc(c.ticket_id || "")}</span></span></span></div>
+      ${thumbs}
+      <button class="btn block ghost" type="button" onclick="location.hash='#home'">Back to my returns</button>`;
+  } else if (c.status === "Photos needed") {
+    const n = Math.min(c.evidence_rounds + 1, c.max_evidence_rounds);
+    v.innerHTML = `${stepper(2)}
+      <section class="result rise"><div class="badge warn">${icon("camera", "i")}</div><div class="title warn">One more photo needed</div>
+        <p class="lead">We couldn't confirm everything from the photos you sent.</p></section>
+      <section class="card"><div class="label">What we checked</div><ul>${checkList(c.checks)}</ul></section>
+      <div class="note warn">${icon("alert")}<span>${esc(c.request || c.message || "Please send another photo.")}</span></div>
+      <button class="btn block warn" type="button" id="upload">${icon("camera")} Upload photo</button>
+      <div id="err" role="alert"></div>
+      <p class="foot">Request ${n} of ${c.max_evidence_rounds}${c.decided_by === "reviewer" ? " · asked by our returns team" : ""}</p>`;
+    $("upload").onclick = () => { pickerTarget = id; $("picker").click(); };
+  } else if (c.status === "With reviewer") {
+    v.innerHTML = `${stepper(3)}
+      <section class="result rise"><div class="badge info">${icon("clock", "i")}</div><div class="title">A specialist is checking your return</div>
+        <p class="lead">${esc(c.message || "")}</p></section>
+      <section class="card"><div class="label">What we checked</div><ul>${checkList(c.checks)}</ul></section>
+      ${thumbs}<p class="foot">This page updates when there is a decision.</p>`;
+    pollTimer = setTimeout(() => showCase(id), 8000);
+  } else if (c.status === "Rejected") {
+    v.innerHTML = `${stepper(3)}
+      <section class="result rise"><div class="badge mute">${icon("info", "i")}</div><div class="title">This return wasn't approved</div>
+        <p class="lead">${esc(c.message || "A specialist reviewed your photos.")}</p></section>
+      <section class="card"><div class="label">What was reviewed</div><ul>${checkList(c.checks)}
+        ${c.review_note ? `<li><span class="mk bad">${icon("x", "i")}</span><span>${esc(c.review_note)}</span></li>` : ""}</ul></section>
+      <div class="note info">${icon("info")}<span>If you believe this is wrong, you can appeal. A different specialist will take a second look.</span></div>
+      <button class="btn block" type="button" id="appeal">${icon("refresh")} Appeal this decision</button><div id="err" role="alert"></div>`;
+    $("appeal").onclick = async () => {
+      try { await postJSON(`/api/cases/${id}/appeal`, {note: ""}); showCase(id); }
+      catch (err) { $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
+    };
+  }
+}
+
+async function sendEvidence(id, files) {
+  if (!files.length) return;
+  const fd = new FormData(); files.forEach((f) => fd.append("images", f));
+  try { await api(`/api/cases/${id}/evidence`, {method: "POST", body: fd}); showCase(id); }
+  catch (err) { if ($("err")) $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
+}
+
+(async () => {
+  me = await api("/api/me");
+  if (me.role !== "customer") { location.href = "/review"; return; }
+  [orders, cfg] = await Promise.all([api("/api/orders"), api("/api/config")]);
+  route();
+})();
+</script>
+</body>
+</html>

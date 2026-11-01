@@ -26,5 +26,35 @@ env/
 *.pt
 *.pth
 *.onnx
+!weights/face_detection_yunet_2023mar.onnx
 *.safetensors
 outputs/
+/runs/
+*.log
+.ipynb_checkpoints/
+
+# App runtime uploads (customer photos)
+data/uploads/*
+
+# CV: datasets, training runs and downloaded models (large, regenerable)
+CV/datasets/
+CV/runs/*
+# ...except the deployed model weights the app uses (checkpoint v1, ~60 MB)
+!CV/runs/deploy/
+!CV/runs/deploy/*.pt
+CV/.pydeps/
+CV/.hf_cache/
+
+# CV: personal and local-only files (notebook uploads include Amazon review photos)
+# CV/demo_photos/
+CV/**/*.json
+CV/real_test
+CV/test_results.xlsx
+CV/demo_photos/
+
+
+
+# CV: AI working notes
+CV/WORKING_CONTEXT.md
+CV/ReturnGuard_Project_Context.md
+reports/
