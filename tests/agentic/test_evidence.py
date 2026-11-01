@@ -44,7 +44,7 @@ def test_supported_stain_features(make_bundle):
     assert f.unmentioned_defects == [] and f.other_defects == [] and f.n_tool_errors == 0
     (d,) = b.defects
     assert d.status == "confirmed" and d.part_location == "sleeve" and d.severity_estimate is Severity.moderate  # 2.7% area
-    assert b.order.status == "found" and [c.clause_id for c in b.clauses] == [f"R{i}" for i in range(1, 8)]
+    assert b.order.status == "found" and [c.clause_id for c in b.clauses] == [f"R{i}" for i in range(1, 9)]
 
 
 def test_every_observation_traces_to_a_real_ledger_call(make_bundle):
