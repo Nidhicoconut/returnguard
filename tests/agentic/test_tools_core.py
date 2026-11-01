@@ -124,7 +124,7 @@ def test_policy_store_parses_the_real_policy_file():
     clauses = PolicyStore().all()
     assert [c.clause_id for c in clauses] == [f"R{i}" for i in range(1, 9)]
     by_id = {c.clause_id: c for c in clauses}
-    assert "30 days" in by_id["R1"].text and "10000" in by_id["R7"].text
+    assert "10 days" in by_id["R1"].text and "5000" in by_id["R7"].text
     assert set(by_id["R2"].covers_defects) == set(DefectClass) and by_id["R1"].covers_defects == []
 
 
