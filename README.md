@@ -1,91 +1,92 @@
 # ReturnGuard
 
-An agentic vision copilot for retail return verification. A customer uploads a photo of an item and says what is wrong. The system **looks** at the photo (computer vision), **checks** the order and the store policy (LLM agent with tools and policy RAG), **decides** (approve, reject, or send to a human), opens a ticket, and shows all of its evidence in a web UI where staff can correct it.
+An agentic vision copilot for clothing return verification. A customer signs in, picks an order, describes the problem and uploads photos. The agent **checks the photos** (quality and integrity), **looks for damage** (trained hole and stain detectors, plus an independent vision-language check), **reads the policy** (RAG) and reaches one of three outcomes: **auto-approve**, **ask for another photo**, or **send to a reviewer**. The one automatic decline is a return outside the 10-day window (the customer can appeal; turn it off with `AUTO_REJECT_OUTSIDE_WINDOW=0` to match the plan's "never auto-reject"). Every other rejection is made by a reviewer, with a reason code. Clothing only for now.
 
 ```
- Browser (static/index.html)
-    │  photo + order + reason                      staff review / corrections
-    ▼                                                      ▲
- FastAPI (app/main.py) ── SQLite (cases, orders, audit events)
-    │
-    ▼
- LangGraph agent (app/agent.py)
-    lookup_order ──► analyze_image ──► retrieve_policy ──► decide ──► finalize
-        │ (no order: skip vision)           │                 │           │
-        ▼                                   ▼                 ▼           ▼
-   orders table                   vision.py (CLIP zero-shot   llm.py +    ticket +
-                                  or classical OpenCV)        decision.py audit log
-                                                              policy.py (TF-IDF RAG)
+ /login ── role choice ──► /customer (mobile)                     /review (desktop)
+                           new return, live agent steps,          queue, evidence pack,
+                           outcome, extra photos, appeal          approve / reject / request info
+                                   │                                      ▲
+                                   ▼                                      │
+ FastAPI (app/main.py) ── SQLite: users, sessions, orders, cases, media, tool_calls, reviews, events
+                                   │
+                                   ▼
+ LangGraph agent (app/agent.py), max 8 tool calls / 120 s per case
+   get_order ► parse_claim ► check_photos ─(no usable photo)──────────────► retrieve_policy ► decide ► ticket
+      (T0)       (LLM)       (T1 + T7)     ► detect_defects ─(weak)► zoom_in ─┤
+                                              (T4, YOLO)              (T4 tiles)
+                                                   └─(needs 2nd look)► verify_with_vlm (T9, Gemini, blind) ┘
 ```
 
-**Design rule: the LLM proposes, the rules dispose.** `app/decision.py` encodes the policy as code. The LLM writes the explanation and proposes a decision, but it can never approve what the rules would not, it can only cite clauses that really exist, and if it disagrees with the rules on a soft case the case goes to a human. If no LLM is configured (or the call fails) the app still works on rules alone.
+**Design rules.** The rules in `app/decision.py` decide; the LLM only proposes and writes the wording. The LLM can make an outcome more cautious (it can stop an automatic approval) but never less. A defect is only auto-approved when the detector **and** the independent vision check both see it. Photo integrity flags, high-value orders (above ₹5,000) and any disagreement go to a reviewer; late returns are declined without checking the photos.
 
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && .venv\Scripts\activate     # Windows (source .venv/bin/activate on macOS/Linux)
 pip install -r requirements.txt
-cp .env.example .env            # optional: add an LLM key or endpoint
-uvicorn app.main:app --reload   # open http://localhost:8000
+pip install ultralytics                            # the trained clothing models (CV/runs/deploy)
+copy .env.example .env                             # then add your keys (see below)
+uvicorn app.main:app --reload                      # open http://localhost:8000
 ```
 
-Try the photos in `samples/` (`crack.png`, `scratch.png`, `stain.png`, `intact_1.png`, `intact_2.png`) against the seeded orders:
+Demo accounts (local demo only; hide the hint with `SHOW_DEMO_ACCOUNTS=0`):
 
-| Try this | Expected |
+| Role | Username | Password | Orders |
+|---|---|---|---|
+| Customer | `asha` | `demo1234` | T-shirt, sweater, jeans delivered 25 days ago (outside the window) |
+| Customer | `ravi` | `demo1234` | Trousers, shirt, ₹6,999 jacket (above the auto-approve limit) |
+| Customer | `neha` | `demo1234` | Dress, socks (non-returnable), hoodie |
+| Reviewer | `reviewer` | `review1234` | Sees every case |
+
+Keys in `.env` (all optional; without them the app still runs on rules and keyword parsing):
+
+| Setting | What it does |
 |---|---|
-| ORD-1001, "arrived with a crack", `crack.png` | Approved, full refund or replacement (R2) |
-| ORD-1002, "changed my mind", `intact_1.png` | Approved, store credit (R3) |
-| ORD-1007, "the strap is torn", `intact_2.png` | Needs human review: claim and photo disagree (R6) |
-| ORD-1004 (delivered 45 days ago), any photo | Rejected: outside window (R1) |
-| ORD-1006 (₹14,999), "cracked", `crack.png` | Needs human review: above the approval limit (R7) |
-| ORD-0000 (unknown order) | Needs human review (R7) |
+| `LLM_PROVIDER`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL` | Text LLM for claim parsing and report wording (Groq, Gemini, Ollama or any OpenAI-compatible endpoint; or `ANTHROPIC_API_KEY`). |
+| `GEMINI_API_KEY`, `VLM_MODEL` | The vision-language check (T9). Free key at https://aistudio.google.com/apikey. Without it, defect claims go to a reviewer instead of being auto-approved. |
+| `CLOTHES_SECOND_OPINION=1` | Grounding DINO second opinion inside the detector (needs `CV/.pydeps`, slow on CPU). |
+| `RETURN_WINDOW_DAYS`, `AUTO_APPROVE_MAX_PRICE` | Business rules (defaults 10 days and ₹5,000, from the project plan). |
 
-To reproduce the evaluation (the 60-image synthetic set is regenerated, not shipped):
+To start again with an empty database: stop the server and delete `data/returnguard.db`.
 
-```bash
-python scripts/make_synthetic_data.py --out data/eval --n 30
-python scripts/evaluate.py --data data/eval --backends heuristic   # add ,clip if torch+transformers are installed
-pytest -q
-```
+## How a case flows
 
-Seed dates are relative to the day the database was created. Run `python -c "from app import db; db.init_db(reset=True)"` to refresh them.
-
-### Choosing the vision backend and the LLM (all optional, set in `.env`)
-
-| Setting | Options |
-|---|---|
-| `VISION_BACKEND` | `auto` (CLIP if torch+transformers are installed, else classical), `clip`, `heuristic` |
-| `LLM_PROVIDER` | `auto`, `anthropic` (set `ANTHROPIC_API_KEY`), `openai` (any OpenAI-compatible endpoint), `rules` (offline) |
-
-No-cost options for the LLM: Ollama locally (`OPENAI_BASE_URL=http://localhost:11434/v1`), or the Gemini or Groq free tiers through their OpenAI-compatible endpoints. API keys stay on the server and are never sent to the browser.
+1. **New return** (customer): order, description (up to 1,000 characters), 1 to 4 photos. Each photo gets a quality pre-check as it is added ("✓ img 1 OK", "⚠ img 2 blurry - retake").
+2. **Verifying**: the agent runs in the background; the page shows its steps as they finish.
+3. **Pre-analysis** (`app/preanalysis.py`): resolution, sharpness and exposure (limits checked on 244 real garment photos), exact and near-duplicate photos across cases (SHA-256 and a 256-bit difference hash), camera date before delivery, editing software. EXIF is read, then stripped from the stored photo. Faces are blurred before a crop is sent to Gemini.
+4. **Detection**: the trained detector and locator from `CV/` (see `CV/README.md`). If the result is weak, or the customer claims damage the first pass did not see, the agent retries on four zoomed tiles.
+5. **Vision check (T9)**: Gemini describes the cropped region without seeing the claim; the comparison with the claim is done in code.
+6. **Decision**: auto-approve (refund for a confirmed defect, store credit for an undamaged change of mind), ask for a specific photo (at most twice), or escalate with a recommendation for the reviewer.
+7. **Review** (reviewer): queue sorted by priority, evidence pack with photos and boxes, parsed claim, findings, order, policy and every tool call; approve, reject or request info, each with a mandatory reason code. A customer whose return was declined can appeal.
 
 ## What is in the box
 
 | Path | What it does |
 |---|---|
-| `app/vision.py` | Two backends with one output format. **Classical:** Otsu thresholding, morphology, large-median "expected appearance", local colour/brightness anomaly, connected components, defect typing by chroma and thickness. **CLIP:** zero-shot prompts on the whole photo plus 2x2 and 3x3 tiles for coarse localisation. |
-| `app/agent.py` | LangGraph workflow with a conditional edge, a trace entry and an audit event per step. |
-| `app/decision.py` | Policy-as-code verdict, merge with the LLM proposal, citation validation. |
-| `app/llm.py` | Anthropic or OpenAI-compatible client, strict-JSON prompt, safe failure. |
-| `app/policy.py`, `policy/return_policy.md` | Policy split into clauses R1 to R7, TF-IDF retrieval. |
-| `app/tools.py`, `app/mcp_server.py` | Four tools (order lookup, vision, policy retrieval, ticket). The MCP server exposes the same functions: `python -m app.mcp_server`. |
-| `app/main.py`, `app/db.py` | REST API, upload validation, SQLite, audit trail. |
-| `static/index.html` | Upload, photo with marked damage regions, decision label, cited policy, agent steps, staff approve/reject, vision feedback, history. |
-| `scripts/make_synthetic_data.py` | Synthetic product photos with known defect boxes (no consent or licensing issues). |
-| `scripts/evaluate.py` | Vision and end-to-end metrics, writes `reports/eval_report.md`. |
-| `tests/` | 11 tests: policy RAG, decision engine, API scenarios, review override, upload validation. |
-
-API: `GET /api/health`, `GET /api/orders`, `POST /api/cases` (multipart: `order_id`, `reason`, `image`), `GET /api/cases`, `GET /api/cases/{id}`, `POST /api/cases/{id}/review`.
+| `app/main.py` | Pages, sign-in, customer and reviewer API, upload validation, private photo serving. |
+| `app/auth.py`, `app/security.py` | Session cookies, role checks, PBKDF2 password hashing. |
+| `app/db.py` | SQLite schema (users, sessions, orders, cases, media, tool_calls, reviews, events) and demo seed data. |
+| `app/agent.py` | LangGraph agent: conditional routing, zoom-in retry, guardrails, live trace, tool-call log. |
+| `app/tools.py`, `app/mcp_server.py` | The tools (T0, T1+T7, T4, T8, T9, T10, claim parsing); the MCP server exposes them: `python -m app.mcp_server`. |
+| `app/preanalysis.py` | Quality gate, integrity checks, EXIF, face blurring. |
+| `app/vision.py` | Trained clothing models (with tiled zoom), with CLIP and an OpenCV heuristic as fallbacks. |
+| `app/vlm.py` | Gemini blind region check and the claim comparison. |
+| `app/llm.py` | Claim parsing (schema-validated, keyword fallback) and the report proposal. |
+| `app/decision.py`, `app/policy.py`, `policy/return_policy.md` | Clothing policy R1 to R8, TF-IDF retrieval, rules engine, reviewer reason codes. |
+| `static/login.html`, `customer.html`, `review.html` | The pages, following the team's Figma wireframes (S1 to S5). |
+| `weights/face_detection_yunet_2023mar.onnx` | OpenCV YuNet face detector (MIT licence) used for blurring. |
+| `tests/` | 26 tests: rules, quality gate, claim parsing, sign-in and access control, end-to-end flows, reviewer and appeal. |
 
 ## Mapping to the rubric
 
 | Rubric row | Where it is covered |
 |---|---|
-| CV-1 | Defect localisation and typing with regions (`vision.py`); tile-grid regions for CLIP. Add a trained U-Net or YOLO later if you have labelled data. |
+| CV-1 | Trained YOLO11 hole and stain detector and locator (`CV/`), boxes shown in the evidence pack, zoomed retry. |
 | CV-2 | Zero-shot learning with CLIP versus the classical baseline, compared in `scripts/evaluate.py` (run with `--backends heuristic,clip`). That comparison is the "informative comparison". |
 | Module 1 | `llm.py` prompt design (strict JSON, grounded in supplied facts, cite-only-provided-clauses). Write up why prompting plus rules was chosen over fine-tuning; LoRA is optional. |
-| Module 2 | LangGraph agent with tools and a conditional route; the same tools served over MCP. A2A is not used because no independent agents need to delegate. |
-| Module 3 | Image plus text in one workflow, evidence inspectable in the UI. Speech is not built (the rubric lists it as optional). |
+| Module 2 | LangGraph agent that picks its next tool from the evidence (skips, zoom-in retry, VLM only when needed), guardrails and a tool-call log; the same tools served over MCP. A2A is not used. |
+| Module 3 | Image plus text: detector, blind VLM check of crops, LLM claim parsing; evidence pack in the UI. Speech is not built (optional). |
 | Module 4 | Runnable app with config and logs. Keep your own examples of AI-assisted requirements, code, debugging, tests and docs for the report. |
 | Module 5 | `evaluate.py`: precision/recall/F1, IoU, decision accuracy per scenario, escalation rate, citation validity, latency. Add human evaluation of explanation quality on real photos. |
 | Frontend / Backend | Upload, overlays, answers, corrections, history and case status; inference endpoints, validation, SQLite, error handling, keys server-side. |
@@ -98,7 +99,7 @@ Suggested split by role: agent and LLM lead (`agent.py`, `decision.py`, `llm.py`
 - **The included metrics are optimistic.** `reports/eval_report.md` is on synthetic photos with plain surfaces from the same generator. Expect real photos to be much harder, especially for the classical backend (printed logos, textures and busy backgrounds look like damage to it). Report numbers from your own consented photos.
 - **Not verified in the build environment:** the CLIP backend (the model download was blocked, so its thresholds are uncalibrated: sweep them on your pilot data), the Anthropic call (no key), and the UI in a real browser. Verified: the full agent and API with the classical backend, the OpenAI-compatible LLM path against a mock server (agreement, soft disagreement, hard rule, citation stripping, offline fallback), the MCP tool list, and a live uvicorn run.
 - The classical baseline reports `inconclusive` when it cannot find the product, and low-confidence or inconclusive photos always go to a human.
-- Defect-claim detection from the customer's text is a keyword match (`decision.py`), chosen so the guardrail is deterministic. Replace it with an LLM classifier if you need more language coverage.
+- The customer's claim is parsed by the LLM into a schema-validated structure, with a keyword parser as the fallback. Whether the customer claims damage decides between the defect rules and the change-of-mind rules.
 
 ## Suggested plan (matches the milestone rows)
 

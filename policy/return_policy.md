@@ -1,22 +1,25 @@
-# ReturnGuard Store Return Policy
+# ReturnGuard Clothing Return Policy
 
 ## R1 Return window
-Customers may request a return within 30 days of the delivery date. Requests made after the 30-day window are declined automatically. The customer may ask a store manager for a goodwill exception, which only a human can grant.
+Clothing may be returned within 10 days of the delivery date. A request made after the window is declined automatically. The customer may appeal, and a store reviewer may then grant a goodwill exception.
 
 ## R2 Verified defects
-If the photo evidence shows a visible defect such as a crack, scratch, stain, tear, dent or broken part, and the request is inside the return window, the customer is entitled to a full refund or a replacement. The defect must be visible in the uploaded photo.
+If the photos show a defect in the garment, such as a hole, tear, split seam, stain or discolouration, and the request is inside the return window, the customer is entitled to a full refund or a replacement. The defect must be visible in the uploaded photos and confirmed by an independent check before a refund is approved automatically.
 
 ## R3 Change of mind
-If the customer simply changed their mind, the item may be returned inside the return window for store credit, not a cash refund. The photo must show the item undamaged and in its original condition.
+A garment that is unworn, undamaged and in its original condition may be returned inside the window for store credit, not a cash refund. The photos must show the garment undamaged.
 
-## R4 Non-returnable categories
-Personal care items, software licences and gift cards cannot be returned for change of mind. A damage or defect claim on these items is never decided automatically and goes to human review.
+## R4 Non-returnable items
+Innerwear, swimwear, socks and customised garments cannot be returned for change of mind for hygiene reasons. A damage claim on these items is never decided automatically and goes to a reviewer.
 
-## R5 Evidence requirement
-Every return needs at least one clear photo of the item. If the photo is unclear, the product cannot be found in it, or the automated confidence is low, the case goes to human review instead of being decided automatically.
+## R5 Photo requirements
+Every return needs at least one clear photo of the whole garment, and a close-up of any damage. If a photo is blurry, too dark, too small or does not show the garment, the customer is asked for a new photo, at most twice. After that the case goes to a reviewer.
 
-## R6 Mismatch between claim and photo
-If the customer reports a defect but the photo shows an undamaged item, or the photo shows damage the customer did not mention, the case goes to human review. It is never approved automatically.
+## R6 Claim and photo do not match
+If the customer reports a defect but the photos do not show one, or the photos show damage the customer did not mention, the case goes to a reviewer. It is never approved or declined automatically.
 
-## R7 Human review and high-value items
-Store staff can override any automated decision, and every override is logged. Refunds above 10000 rupees always need human approval. Orders that cannot be found are sent to human review.
+## R7 Reviewers and high-value orders
+Apart from late returns (R1), only a store reviewer can decline a return, and every reviewer decision is logged with a reason code. Orders above 5000 rupees always need a reviewer's approval. Orders that cannot be found go to a reviewer.
+
+## R8 Photo integrity
+If a photo was already used in another return, or its camera details do not fit the order, the case goes to a reviewer. These checks are recorded as observations, not as an accusation, and the reviewer decides.
