@@ -1,0 +1,80 @@
+[
+ {
+  "order_id": "ORD-3001",
+  "customer": "asha",
+  "product": "Women's V-Neck Crop Sweater",
+  "product_type": "sweater",
+  "colour": "white",
+  "price": 1299,
+  "days_since_delivery": 3,
+  "sku": "B08CRKG11D",
+  "photo": "ORD-3001_asha_upload.jpg",
+  "review_title": "Came with a hole at the seam low quality",
+  "review_text": "Has a hole in it at the seam......poorly made. You get what you pay for."
+ },
+ {
+  "order_id": "ORD-3002",
+  "customer": "asha",
+  "product": "SheIn Mock Neck Ribbed Knit Tee",
+  "product_type": "t-shirt",
+  "colour": "army green",
+  "price": 899,
+  "days_since_delivery": 4,
+  "sku": "B07MP31CQB",
+  "photo": "ORD-3002_asha_upload.jpg",
+  "review_title": "Arrived damaged due to poor quality.",
+  "review_text": "Shirt arrived damaged. 2 inch tear in collar. Very thin fabric."
+ },
+ {
+  "order_id": "ORD-3003",
+  "customer": "ravi",
+  "product": "Cable Knit Sweater Set (hoodie crop top and sweatpants)",
+  "product_type": "sweater set",
+  "colour": "black",
+  "price": 2799,
+  "days_since_delivery": 2,
+  "sku": "B0BK95GYJ2",
+  "photo": "ORD-3003_ravi_upload.jpg",
+  "review_title": "UPDATE!!! This is cute but JUNK\u2026SUPER CUTE.",
+  "review_text": "UPDATE!! (Feb 2023) Hate to say this, but this set is AWFUL. Do. NOT. Buy!! Made like pure junk. Snags on anything g and everything. Runs and pulls so easily. Had an actual HOLE in it only hours after putting it on!! It is woven so loosely and pulls for no reason. Ugh. Hate to return it but will NOT have a set that is ruined hours after putting it on (& I was rising in the car and walking onto a s"
+ },
+ {
+  "order_id": "ORD-3004",
+  "customer": "ravi",
+  "product": "Zexxxy Striped Short-Sleeve Pyjama Set",
+  "product_type": "pyjama set",
+  "colour": "grey",
+  "price": 1099,
+  "days_since_delivery": 5,
+  "sku": "B07D2C7Q8S",
+  "photo": "ORD-3004_ravi_upload.jpg",
+  "review_title": "Cheap Fabric",
+  "review_text": "I purchased this on a whim while it was on sale. I was initially very happy with how soft the fabric was and how everything fit. However, after two washes, the fabric on the shirt did not hold up. My 10 month old baby pulled ever so slightly on my shirt, and it ripped. I didn't even have the pajama set for whole month, so I'm very disappointed."
+ },
+ {
+  "order_id": "ORD-3005",
+  "customer": "neha",
+  "product": "Hue Chevron Quilted Control-Top Tights",
+  "product_type": "tights",
+  "colour": "navy",
+  "price": 1499,
+  "days_since_delivery": 3,
+  "sku": "B01IW8LO0G",
+  "photo": "ORD-3005_neha_upload.jpg",
+  "review_title": "Beautiful tights but item arrived damaged :(",
+  "review_text": "Disappointed to discover these arrived with a large hole new out right out of the packaging. Aside from the hole, the quality and fit are great."
+ },
+ {
+  "order_id": "ORD-3006",
+  "customer": "neha",
+  "product": "Delia's Girls Thermal Knit Shirt and Pant Set, 2-pack",
+  "product_type": "thermal set",
+  "colour": "lavender and pink",
+  "price": 1199,
+  "days_since_delivery": 6,
+  "sku": "B0773WMP4K",
+  "photo": "ORD-3006_neha_upload.jpg",
+  "review_title": "Hole after 1st Use",
+  "review_text": "These are being used as PJ'S for my 6yo daughter. I think they are cute. I like the 2 pack option with the colors of pink and purple. She was happy to receive them and wore both pair already. The fit was a little tighter than I expected. She is in between sizes 8 and 10 depending on the brand. I was sure that she would have plenty of room in the size 10/12, but it fits pretty snug. Lastly, after w"
+ }
+]
