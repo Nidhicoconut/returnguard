@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pickups · ReturnGuard</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css?v=4">
+<style>
+/* The pickup partner's app: used on a phone at the customer's door, so large targets and one column. */
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.top { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
+.top .inner { max-width: 720px; margin: 0 auto; padding: 0 16px; height: 56px; display: flex; align-items: center; gap: 12px; }
+.top .tag { font-size: 13px; color: var(--ink-3); border-left: 1px solid var(--line); padding-left: 12px; }
+.me { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--warn-bg); color: var(--warn); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+.icon-btn { width: 36px; height: 36px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--ink-2); display: grid; place-items: center; cursor: pointer; }
+.icon-btn:hover { background: var(--subtle); border-color: var(--line); }
+main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 16px; align-content: start; }
+main > *, .card-body { min-width: 0; }  /* the scrolling photo strip must not widen the cards past the screen */
+.who .line span { overflow-wrap: anywhere; }
+.snap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.snap img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.page-head p { color: var(--ink-2); margin-top: 4px; }
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.summary .card { padding: 12px 14px; display: grid; gap: 2px; }
+.summary .n { font-size: 22px; font-weight: 600; }
+.summary .l { font-size: 12px; color: var(--ink-3); }
+.group-label { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 6px 2px -4px; }
+/* job cards */
+.job { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; padding: 14px; align-items: center; color: inherit; }
+.job:hover { text-decoration: none; background: var(--subtle); }
+.job + .job { border-top: 1px solid var(--line); }
+.thumb { width: 64px; height: 64px; border-radius: 8px; border: 1px solid var(--line); background: var(--subtle); overflow: hidden; display: grid; place-items: center; color: var(--ink-3); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.job h3 { font-size: 14px; font-weight: 600; }
+.job .addr { font-size: 13px; color: var(--ink-2); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.job .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; font-size: 12px; color: var(--ink-3); align-items: center; }
+.job > svg { color: var(--ink-3); }
+/* job page */
+.back { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.back svg { width: 16px; height: 16px; }
+.who { display: grid; gap: 6px; }
+.who .line { display: grid; grid-template-columns: 18px 1fr; gap: 8px; font-size: 14px; color: var(--ink-2); align-items: start; }
+.who .line svg { width: 18px; height: 18px; color: var(--ink-3); margin-top: 1px; }
+.gallery { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.gallery img { width: 88px; height: 88px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); flex: none; }
+.gallery img:first-child { width: 132px; height: 132px; }
+.item-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; margin: 14px 0 0; }
+.item-facts dt { color: var(--ink-3); } .item-facts dd { margin: 0; }
+.reported { font-size: 14px; color: var(--ink-2); border-left: 2px solid var(--line-strong); padding-left: 10px; }
+.cphotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+.cphotos .photo { border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: #000; }
+.cphotos .photo img { width: 100%; height: 180px; object-fit: contain; }
+.cphotos .cap { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+.cphotos .cap.dmg { color: var(--bad); font-weight: 500; }
+/* checklist */
+.checklist { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 12px; align-items: start; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 10px; cursor: pointer; font-size: 14px; }
+.check input { width: 20px; height: 20px; margin: 0; accent-color: var(--ok); }
+.check:has(input:checked) { border-color: var(--ok-line); background: var(--ok-bg); }
+.code-input { font: 600 24px/1 var(--mono); letter-spacing: .5em; text-align: center; height: 52px; max-width: 220px; }
+.reasons { display: grid; gap: 8px; }
+.reason { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; cursor: pointer; font-size: 14px; }
+.reason:has(input:checked) { border-color: var(--bad-line); background: var(--bad-bg); }
+.actions { display: grid; gap: 10px; }
+.failbox { display: grid; gap: 12px; } .failbox[hidden] { display: none; }
+.done-card { text-align: center; padding: 28px 20px; display: grid; gap: 8px; justify-items: center; }
+.done-card .ic { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; }
+.done-card .ic.ok { background: var(--ok-bg); color: var(--ok); } .done-card .ic.bad { background: var(--bad-bg); color: var(--bad); }
+.done-card .ic svg { width: 24px; height: 24px; }
+.done-card p { color: var(--ink-2); max-width: 42ch; }
+.pphoto { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+@media (max-width: 420px) { .summary .n { font-size: 20px; } .job { grid-template-columns: 56px 1fr; } .job > svg { display: none; } .thumb { width: 56px; height: 56px; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="inner">
+  <span id="logo"></span><span class="tag">Pickups</span>
+  <div class="me" id="me"></div>
+</div></header>
+<main id="view"><div class="empty"><span class="spin"></span></div></main>
+<script src="/static/app.js?v=4"></script>
+<script>
+let me = null, jobs = [];
+const day = (iso) => {
+  const d = new Date(iso + "T00:00:00"), t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - t) / 86400000);
+  return diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : d.toLocaleDateString("en-IN", {weekday: "short", day: "numeric", month: "short"});
+};
+const STATE = {scheduled: ["info", "To collect"], picked_up: ["ok", "Collected"], failed: ["bad", "Not collected"]};
+const badge = (s) => { const [c, l] = STATE[s] || ["mute", s]; return `<span class="badge ${c}">${l}</span>`; };
+const thumb = (img) => `<div class="thumb">${img ? `<img src="${esc(img)}" alt="">` : icon("package")}</div>`;
+const mapsLink = (addr) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr || "")}`;
+
+$("logo").innerHTML = logoHTML(false, "/pickup");
+document.body.insertAdjacentHTML("beforeend", footerHTML());
+
+function route() {
+  window.scrollTo(0, 0);
+  const m = (location.hash || "").match(/^#job-(\d+)$/);
+  return m ? showJob(+m[1]) : showList();
+}
+window.addEventListener("hashchange", route);
+
+/* ---------------- list ---------------- */
+function jobRow(j) {
+  return `<a class="job" href="#job-${j.id}">${thumb(j.image)}
+    <div><h3>${esc(j.customer)}</h3><div class="addr">${esc(j.address || "")}</div>
+      <div class="meta">${badge(j.status)}${j.status === "scheduled" ? `<span>${esc(day(j.scheduled_for))}, ${esc(j.slot)}</span>` : ""}
+        <span>${esc(j.product)}</span>${j.attempts > 1 && j.status === "scheduled" ? `<span>Visit ${j.attempts}</span>` : ""}</div></div>${icon("chevron")}</a>`;
+}
+async function showList() {
+  document.title = "Pickups · ReturnGuard";
+  jobs = await api("/api/pickups");
+  const open = jobs.filter((j) => j.status === "scheduled"), done = jobs.filter((j) => j.status !== "scheduled");
+  const today = open.filter((j) => day(j.scheduled_for) === "Today" || new Date(j.scheduled_for) < new Date()).length;
+  $("view").innerHTML = `
+    <div class="page-head"><h1>Your pickups</h1><p>Check each item at the door before you collect it. The refund is issued when you confirm.</p></div>
+    <div class="summary">
+      <div class="card"><span class="n">${open.length}</span><span class="l">To collect</span></div>
+      <div class="card"><span class="n">${today}</span><span class="l">Due today</span></div>
+      <div class="card"><span class="n">${done.filter((j) => j.status === "picked_up").length}</span><span class="l">Collected</span></div>
+    </div>
+    <div class="group-label">To collect</div>
+    <section class="card">${open.length ? open.map(jobRow).join("") : `<div class="empty">${icon("truck")}<p>No pickups waiting. New ones appear here when a return is approved.</p></div>`}</section>
+    ${done.length ? `<div class="group-label">Finished</div><section class="card">${done.map(jobRow).join("")}</section>` : ""}`;
+}
+
+/* ---------------- one pickup ---------------- */
+async function showJob(id) {
+  let j;
+  try { j = await api(`/api/pickups/${id}`); } catch (err) { $("view").innerHTML = `<a class="back" href="#">${icon("back")}All pickups</a><div class="error">${esc(err.message)}</div>`; return; }
+  document.title = `${j.customer} · Pickups · ReturnGuard`;
+  const damage = j.kind === "Refund";
+  $("view").innerHTML = `
+    <a class="back" href="#">${icon("back")}All pickups</a>
+    <div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+      <div><h1>${esc(j.customer)}</h1><p>Return <span class="mono">${caseNo(j.case_id)}</span> · order <span class="mono">${esc(j.order_id)}</span></p></div>${badge(j.status)}</div>
+    <section class="card"><div class="card-body who">
+      <div class="line">${icon("pin")}<span>${esc(j.address || "No address on file")}</span></div>
+      ${j.status === "scheduled" ? `<div class="line">${icon("clock")}<span>${esc(day(j.scheduled_for))}, ${esc(j.slot)}${j.attempts > 1 ? ` · visit ${j.attempts} of ${j.max_attempts}` : ""}</span></div>` : ""}
+      ${j.address && j.status === "scheduled" ? `<a class="btn secondary sm" style="justify-self:start;margin-top:4px" href="${mapsLink(j.address)}" target="_blank" rel="noopener">${icon("pin")}Open in Maps</a>` : ""}
+    </div></section>
+
+    <section class="card"><div class="card-head"><h3>Item to collect</h3><span class="badge mute">${esc(j.kind)}</span></div><div class="card-body">
+      ${j.catalog_photos.length ? `<div class="gallery">${j.catalog_photos.map((u) => `<img src="${esc(u)}" alt="Product photo">`).join("")}</div>` : ""}
+      <dl class="item-facts"><dt>Item</dt><dd><b>${esc(j.product)}</b></dd>${j.colour ? `<dt>Colour</dt><dd>${esc(j.colour)}</dd>` : ""}
+        <dt>Price</dt><dd>${rupees(j.price)}</dd></dl></div></section>
+
+    <section class="card"><div class="card-head"><h3>What the customer reported</h3></div><div class="card-body">
+      <p class="reported">${esc(j.reason)}</p>
+      ${j.photos.length ? `<div class="cphotos">${j.photos.map((p, i) => `<div><div class="photo"><img src="${esc(p.url)}" alt="Customer photo ${i + 1}">${boxesHTML(p.regions)}</div>
+        <div class="cap ${p.damage ? "dmg" : ""}">${p.damage ? "Damage marked in red" : `Customer photo ${i + 1}`}</div></div>`).join("")}</div>` : ""}
+      ${damage ? `<p class="small faint" style="margin-top:10px">Find this damage on the item before you collect it.</p>` : ""}
+    </div></section>
+
+    ${j.status === "scheduled" ? checkHTML(j) : resultHTML(j)}`;
+  if (j.status === "scheduled") wireCheck(j);
+}
+
+function checkHTML(j) {
+  return `<section class="card" id="checkcard"><div class="card-head"><h3>Doorstep check</h3></div><div class="card-body" style="display:grid;gap:18px">
+    <div class="checklist">${j.checklist.map((k) => `<label class="check"><input type="checkbox" value="${esc(k.key)}"><span>${esc(k.text)}</span></label>`).join("")}</div>
+    <div class="field"><span class="label-text">Photo of the item <span class="faint" style="font-weight:400">(optional)</span></span>
+      <div class="snap"><img id="snapimg" alt="" hidden>
+        <label class="btn secondary sm" for="pphoto">${icon("camera")}<span id="snaplabel">Take a photo</span></label></div>
+      <input type="file" id="pphoto" accept="image/jpeg,image/png,image/webp" capture="environment" hidden></div>
+    <div class="field"><label for="note">Note <span class="faint" style="font-weight:400">(optional)</span></label>
+      <textarea id="note" maxlength="500" placeholder="For example: tags attached, packed in the original bag." style="min-height:64px"></textarea></div>
+    <div class="field"><label for="code">Pickup code from the customer</label>
+      <input type="text" id="code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="····">
+      <span class="small faint">The customer sees this 4-digit code on their return page. Ask for it after the check.</span></div>
+    <div id="err" role="alert"></div>
+    <div class="actions">
+      <button class="btn ok block" type="button" id="confirm">${icon("check")}Confirm pickup</button>
+      <button class="btn secondary block" type="button" id="cant">Can't collect</button>
+    </div>
+    <div id="failbox" class="failbox" hidden>
+      <div class="label-text">Why couldn't you collect it?</div>
+      <div class="reasons">${Object.entries(j.fail_reasons).map(([k, t]) => `<label class="reason"><input type="radio" name="why" value="${esc(k)}"><span>${esc(t)}${k === "not_home" ? ` <span class="faint">(we'll try again tomorrow)</span>` : ""}</span></label>`).join("")}</div>
+      <button class="btn danger block" type="button" id="failsend">Report and don't collect</button>
+    </div>
+  </div></section>`;
+}
+
+function wireCheck(j) {
+  const ticked = () => [...document.querySelectorAll(".check input:checked")].map((x) => x.value);
+  const err = (m) => { $("err").innerHTML = m ? `<div class="error">${esc(m)}</div>` : ""; };
+  $("pphoto").onchange = () => {
+    const f = $("pphoto").files[0];
+    $("snapimg").hidden = !f;
+    if (f) { $("snapimg").src = URL.createObjectURL(f); $("snaplabel").textContent = "Retake photo"; }
+  };
+  $("code").oninput = () => { $("code").value = $("code").value.replace(/\D/g, "").slice(0, 4); };
+  $("confirm").onclick = async () => {
+    err("");
+    if (ticked().length < j.checklist.length) return err("Tick every check first. If something doesn't match, choose “Can't collect”.");
+    if ($("code").value.length !== 4) return err("Enter the customer's 4-digit pickup code.");
+    const fd = new FormData();
+    fd.append("code", $("code").value); fd.append("checks", ticked().join(",")); fd.append("note", $("note").value);
+    if ($("pphoto").files[0]) fd.append("photo", $("pphoto").files[0]);
+    $("confirm").disabled = true;
+    try { await api(`/api/pickups/${j.id}/complete`, {method: "POST", body: fd}); showJob(j.id); }
+    catch (e) { err(e.message); $("confirm").disabled = false; }
+  };
+  $("cant").onclick = () => { $("failbox").hidden = !$("failbox").hidden; if (!$("failbox").hidden) $("failbox").scrollIntoView({behavior: "smooth", block: "center"}); };
+  $("failsend").onclick = async () => {
+    err("");
+    const why = document.querySelector("input[name=why]:checked");
+    if (!why) return err("Choose a reason.");
+    if (why.value !== "not_home" && !$("note").value.trim()) return err("Add a note saying what didn't match.");
+    $("failsend").disabled = true;
+    try {
+      const r = await postJSON(`/api/pickups/${j.id}/fail`, {reason: why.value, note: $("note").value, checks: ticked()});
+      if (r.outcome === "rescheduled") { location.hash = ""; } else showJob(j.id);
+    } catch (e) { err(e.message); $("failsend").disabled = false; }
+  };
+}
+
+function resultHTML(j) {
+  if (j.status === "picked_up") return `<section class="card done-card"><span class="ic ok">${icon("check")}</span>
+    <h2>Collected and verified</h2><p>Confirmed ${fmtDateTime(j.verified_at)}. The customer's ${j.kind === "Refund" ? "refund" : "store credit"} of ${rupees(j.price)} has been issued.</p>
+    ${j.photo ? `<img class="pphoto" src="${esc(j.photo)}" alt="Photo taken at pickup">` : ""}${j.note ? `<p class="small">“${esc(j.note)}”</p>` : ""}
+    <a class="btn secondary sm" href="#">Back to pickups</a></section>`;
+  return `<section class="card done-card"><span class="ic bad">${icon("x")}</span>
+    <h2>Not collected</h2><p>${esc(j.failure || "")}. The returns team will look at this return.</p>${j.note ? `<p class="small">“${esc(j.note)}”</p>` : ""}
+    <a class="btn secondary sm" href="#">Back to pickups</a></section>`;
+}
+
+(async () => {
+  me = await api("/api/me");
+  if (me.role !== "courier") { location.href = ROLE_HOME[me.role] || "/login"; return; }
+  $("me").innerHTML = `<span class="avatar" title="${esc(me.name)}">${esc(initials(me.name))}</span>
+    <button type="button" class="icon-btn" aria-label="Sign out" title="Sign out" onclick="logout()">${icon("logout")}</button>`;
+  route();
+})();
+</script>
+</body>
+</html>

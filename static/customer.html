@@ -3,357 +3,509 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>My returns · ReturnGuard</title>
+<title>Your orders · ReturnGuard</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/app.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css?v=4">
 <style>
-/* Customer screens (wireframes S2 and S3): a phone-width app; on a wide screen it floats as a card. */
-.phone { max-width: 460px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
-@media (min-width: 520px) { body { background: linear-gradient(180deg, var(--navy) 0, var(--navy) 220px, var(--bg) 220px); }
-  .phone { margin: 28px auto; min-height: calc(100vh - 56px); border-radius: 26px; overflow: hidden; box-shadow: var(--shadow-lg); } }
-.bar { gap: 10px; }
-.bar h1 { flex: 1; text-align: center; font-size: 16px; }
-.bar .left, .bar .right { width: 92px; display: flex; align-items: center; }
-.bar .right { justify-content: flex-end; }
-.iconbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); color: #fff; display: grid; place-items: center; cursor: pointer; }
-.iconbtn:hover { background: rgba(255,255,255,.2); }
-main { padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+body { min-height: 100vh; display: flex; flex-direction: column; }
+/* header */
+.top { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
+.top .inner { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; gap: 32px; }
+.nav { display: flex; gap: 4px; height: 100%; }
+.nav a { display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--ink-2); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.nav a:hover { color: var(--ink); text-decoration: none; }
+.nav a[aria-current="page"] { color: var(--brand); border-bottom-color: var(--brand); }
+.account { margin-left: auto; position: relative; }
+.account-btn { display: flex; align-items: center; gap: 8px; border: 1px solid transparent; background: none; padding: 4px 6px 4px 4px; border-radius: 8px; cursor: pointer; }
+.account-btn:hover { background: var(--subtle); border-color: var(--line); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+.menu { position: absolute; right: 0; top: 46px; min-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-lg); padding: 6px; }
+.menu .who { padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.menu button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+.menu button:hover { background: var(--subtle); color: var(--ink); }
+@media (max-width: 720px) {  /* phones: the section links move to a bottom tab bar */
+  .top .inner { gap: 12px; padding: 0 16px; height: 56px; } .account-btn .nm { display: none; }
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; height: calc(60px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+         background: #fff; border-top: 1px solid var(--line); gap: 0; z-index: 30; box-shadow: 0 -1px 3px rgba(16, 24, 40, .04); }
+  .nav a { flex: 1; flex-direction: column; justify-content: center; gap: 2px; padding: 0; margin: 0; border: 0; font-size: 11px; }
+  .nav a svg { box-sizing: content-box; padding: 4px 18px; border-radius: 999px; transition: background .15s; }
+  .nav a[aria-current="page"] { color: var(--brand); font-weight: 600; }
+  .nav a[aria-current="page"] svg { background: var(--brand-soft); }  /* pill behind the active icon, as in most mobile apps */
+  body { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+  .site-footer { display: none; }  /* the tab bar replaces it; the policy is linked from Help */
+}
 
-/* home */
-.hero { position: relative; overflow: hidden; border-radius: 20px; padding: 22px 20px; color: #fff;
-        background: linear-gradient(135deg, var(--navy-2), var(--navy)); box-shadow: var(--shadow); }
-.hero::after { content: ""; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(255,122,89,.55), rgba(255,122,89,0) 70%); }
-.hero h2 { font-size: 22px; font-weight: 800; position: relative; }
-.hero p { margin: 6px 0 16px; color: #c9d3ea; font-size: 14px; position: relative; max-width: 30ch; }
-.hero .btn { position: relative; }
-.section-title { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
-.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.ret { width: 100%; text-align: left; display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center;
-       background: var(--surface); border: 0; border-radius: 16px; padding: 10px 12px 10px 10px; cursor: pointer; box-shadow: var(--shadow); transition: transform .15s; }
-.ret:hover { transform: translateY(-1px); }
-.ret img, .ret .ph { width: 56px; height: 56px; object-fit: cover; border-radius: 12px; background: #e3e8f1; }
-.ret b { display: block; font-size: 15px; }
-.ret .r { display: grid; justify-items: end; gap: 6px; color: var(--ink-3); }
-.empty { text-align: center; padding: 34px 16px; color: var(--ink-2); background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); }
-.empty .em { width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%; background: var(--coral-soft); color: var(--coral); display: grid; place-items: center; }
+main { flex: 1; width: 100%; max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; display: grid; gap: 24px; align-content: start; }
+@media (max-width: 720px) { main { padding: 24px 16px 48px; } }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-head p { color: var(--ink-2); margin-top: 4px; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-3); margin-bottom: 10px; }
+.crumbs a { color: var(--ink-2); }
+.crumbs svg { width: 14px; height: 14px; }
 
-/* new return */
-.panel { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
-.panel > label:first-child { margin-top: 0; }
-.orders { display: grid; gap: 8px; }
-.order { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 12px; border: 1.5px solid var(--line); border-radius: 14px; cursor: pointer; transition: border-color .15s, background .15s; }
-.order:hover { border-color: var(--line-2); }
-.order input { accent-color: var(--coral); width: 18px; height: 18px; margin: 0; }
-.order:has(input:checked) { border-color: var(--coral); background: #fffaf8; box-shadow: 0 0 0 3px var(--coral-soft); }
-.order b { display: block; font-size: 14.5px; }
-.order .price { font-weight: 700; font-size: 14px; }
-.order .win { font-size: 12px; }
-.win.ok { color: var(--ok); } .win.late { color: var(--bad); }
-.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.quick button { border: 1px solid var(--line-2); background: #fff; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
-.quick button:hover { border-color: var(--coral); color: var(--coral); }
-.counter { text-align: right; font-size: 12px; color: var(--ink-3); margin-top: 4px; }
-.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.tile { position: relative; aspect-ratio: 1; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); overflow: hidden; display: grid; place-items: center; font-size: 13px; color: var(--ink-2); cursor: pointer; padding: 0; }
-.tile img { width: 100%; height: 100%; object-fit: cover; }
-.tile .x { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(15,22,40,.65); color: #fff; display: grid; place-items: center; }
-.tile .x svg { width: 13px; height: 13px; }
-.tile .q { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.tile .q.ok { background: var(--ok-bg); color: var(--ok); } .tile .q.bad { background: var(--warn-bg); color: var(--warn); }
-.tile.add { border: 1.5px dashed var(--line-2); background: #fff; color: var(--navy-3); display: grid; gap: 4px; align-content: center; justify-items: center; font-weight: 700; }
-.tile.add svg { width: 24px; height: 24px; }
-.tile.bad { border-color: var(--warn-btn); }
-.checks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; margin-top: 10px; }
-.checks .ok { color: var(--ok); } .checks .warn { color: var(--warn); }
-.tips { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; font-size: 13px; color: var(--ink-2); background: var(--info-bg); border-radius: 14px; padding: 12px; }
-.tips svg { color: var(--info); width: 20px; height: 20px; margin-top: 1px; }
+/* orders */
+.order { display: grid; grid-template-columns: 96px 1fr auto; gap: 20px; padding: 20px; align-items: center; }
+.order + .order { border-top: 1px solid var(--line); }
+.thumb { width: 96px; height: 96px; border-radius: 8px; background: var(--subtle); border: 1px solid var(--line); overflow: hidden; display: grid; place-items: center; color: var(--ink-3); flex: none; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb.sm { width: 48px; height: 48px; border-radius: 6px; }
+.order h3 { font-size: 15px; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+.window { margin-top: 8px; font-size: 13px; }
+.window.ok { color: var(--ok); } .window.closed { color: var(--ink-3); }
+.order .side { display: grid; justify-items: end; gap: 10px; }
+.price { font-weight: 600; }
+@media (max-width: 720px) { .order { grid-template-columns: 64px 1fr; } .order .thumb { width: 64px; height: 64px; } .order .side { grid-column: 1 / -1; justify-items: start; grid-auto-flow: column; align-items: center; } }
 
-/* case screens */
-.stepper { display: grid; grid-template-columns: 1fr 1fr 1fr; position: relative; margin: 4px 6px 6px; }
-.stepper::before { content: ""; position: absolute; left: 16%; right: 16%; top: 13px; height: 3px; background: var(--line); border-radius: 3px; }
-.stepper .fill { position: absolute; left: 16%; top: 13px; height: 3px; background: var(--coral); border-radius: 3px; transition: width .4s; }
-.st { display: grid; justify-items: center; gap: 6px; position: relative; font-size: 12px; color: var(--ink-3); font-weight: 600; }
-.st .dot { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 3px solid var(--line); display: grid; place-items: center; font-size: 12px; color: var(--ink-3); }
-.st.done .dot { background: var(--coral); border-color: var(--coral); color: #fff; }
-.st.now .dot { border-color: var(--coral); color: var(--coral); }
-.st.done, .st.now { color: var(--ink); }
-.st .dot svg { width: 14px; height: 14px; stroke-width: 3; }
-.result { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 22px 18px; text-align: center; display: grid; gap: 8px; justify-items: center; }
-.badge { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; }
-.badge svg { width: 32px; height: 32px; stroke-width: 2.4; }
-.badge.ok { background: var(--ok-bg); color: var(--ok); box-shadow: 0 0 0 8px #f0faf5; }
-.badge.warn { background: var(--warn-bg); color: var(--warn-btn); box-shadow: 0 0 0 8px #fffaee; }
-.badge.info { background: var(--info-bg); color: var(--info); box-shadow: 0 0 0 8px #f3f6ff; }
-.badge.mute { background: #eceff4; color: var(--ink-2); box-shadow: 0 0 0 8px #f6f7fa; }
-.title { font-size: 21px; font-weight: 800; margin-top: 8px; }
-.title.ok { color: var(--ok); } .title.warn { color: #b07b00; }
-.lead { color: var(--ink-2); font-size: 14px; max-width: 34ch; margin: 0; }
-.card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
-.card .label { margin-bottom: 10px; }
-.card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 14px; }
-.card li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; }
-.mk { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
-.mk svg { width: 13px; height: 13px; stroke-width: 3; }
-.mk.ok { background: var(--ok-bg); color: var(--ok); } .mk.warn { background: var(--warn-bg); color: var(--warn); } .mk.bad { background: var(--bad-bg); color: var(--bad); }
-.timeline li { position: relative; }
-.timeline li:not(:last-child)::after { content: ""; position: absolute; left: 10px; top: 24px; bottom: -9px; width: 2px; background: var(--line); }
-.mk.now { background: var(--info-bg); }
-.mk.now::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--info); animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse { 50% { transform: scale(1.6); opacity: .4; } }
-.ring { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; background: var(--info-bg); box-shadow: 0 0 0 8px #f3f6ff; }
-.ring .spin { width: 34px; height: 34px; border-width: 4px; }
-.note { border-radius: 16px; padding: 14px 16px; font-size: 14px; display: grid; grid-template-columns: 24px 1fr; gap: 10px; }
-.note svg { width: 20px; height: 20px; }
-.note.warn { background: var(--warn-box); border: 1px solid #f3d384; color: #6d4a00; }
-.note.ok { background: var(--ok-bg); color: #0d5c3e; }
-.note.info { background: var(--info-bg); color: #24438f; }
-.foot { text-align: center; font-size: 12.5px; color: var(--ink-3); }
-.mythumbs { display: flex; gap: 8px; flex-wrap: wrap; }
-.mythumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: 12px; box-shadow: var(--shadow); }
+/* two-column pages */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+.phone-only { display: none; }
+.table td.mono { white-space: nowrap; }
+@media (max-width: 640px) {
+  .wide-only { display: none; }
+  .phone-only { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .table th, .table td { padding-left: 16px; padding-right: 16px; }
+}
+.stack { display: grid; gap: 24px; }
+.summary .card-body { display: grid; gap: 14px; }
+.summary .item { display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center; }
+.summary .item .thumb { width: 64px; height: 64px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 13px; margin: 0; }
+.kv dt { color: var(--ink-3); } .kv dd { margin: 0; text-align: right; color: var(--ink); }
+.steps-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; font-size: 13px; color: var(--ink-2); counter-reset: s; }
+.steps-list li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; }
+.steps-list li::before { counter-increment: s; content: counter(s); width: 22px; height: 22px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 600; font-size: 12px; display: grid; place-items: center; }
+
+/* return form */
+.form-section { padding: 24px; display: grid; gap: 16px; }
+.form-section + .form-section { border-top: 1px solid var(--line); }
+.form-section h2 { font-size: 16px; display: flex; gap: 10px; align-items: center; }
+.form-section h2 .n { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-strong); font-size: 12px; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+.reasons { display: grid; gap: 8px; }
+.reason { display: grid; grid-template-columns: 20px 1fr; gap: 12px; align-items: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-weight: 400; }
+.reason:hover { background: var(--subtle); }
+.reason input { margin: 3px 0 0; accent-color: var(--brand); width: 16px; height: 16px; }
+.reason:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.reason b { display: block; font-weight: 500; }
+.reason span { font-size: 13px; color: var(--ink-3); }
+.counter { text-align: right; font-size: 12px; color: var(--ink-3); }
+.drop { border: 1px dashed var(--line-strong); border-radius: 8px; padding: 24px; text-align: center; background: var(--subtle); cursor: pointer; display: grid; justify-items: center; gap: 6px; }
+.drop:hover, .drop.over { border-color: var(--brand); background: var(--brand-soft); }
+.drop .ic { width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-2); }
+.drop b { color: var(--brand); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.tile { display: grid; gap: 6px; font-size: 12px; align-content: start; }
+.tile .im { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--subtle); }
+.tile .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .rm { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 6px; border: 0; background: rgba(16, 24, 40, .7); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.tile .rm svg { width: 14px; height: 14px; }
+.tile .st { display: flex; align-items: flex-start; gap: 5px; line-height: 1.35; }
+.tile .st.ok { color: var(--ok); } .tile .st.warn { color: var(--warn); } .tile .st.bad { color: var(--bad); }
+.tile .st svg { width: 14px; height: 14px; margin-top: 1px; }
+.tile.bad .im { border-color: var(--bad-line); } .tile.bad img { opacity: .55; }
+.tile.warn .im { border-color: var(--warn-line); }
+.tile.ok .im { border-color: var(--ok-line); }
+.form-foot { padding: 20px 24px; border-top: 1px solid var(--line); display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; background: var(--subtle); }
+
+/* return detail */
+.outcome { padding: 24px; display: grid; grid-template-columns: 44px 1fr; gap: 16px; }
+.outcome .ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+.outcome .ic svg { width: 22px; height: 22px; }
+.outcome.ok .ic { background: var(--ok-bg); color: var(--ok); } .outcome.warn .ic { background: var(--warn-bg); color: var(--warn); }
+.outcome.info .ic { background: var(--info-bg); color: var(--info); } .outcome.bad .ic { background: var(--bad-bg); color: var(--bad); }
+.outcome h2 { font-size: 18px; }
+.outcome p { color: var(--ink-2); margin-top: 6px; }
+.outcome .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.progress { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; font-size: 13px; }
+.progress li { display: flex; align-items: center; gap: 10px; color: var(--ink-2); }
+.progress .done svg { color: var(--ok); width: 16px; height: 16px; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; }
+.timeline li { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding-bottom: 18px; position: relative; }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li::after { content: ""; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 2px; background: var(--line); }
+.timeline li:last-child::after { display: none; }
+.timeline .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #fff; border: 2px solid var(--line-strong); }
+.timeline .dot svg { width: 12px; height: 12px; stroke-width: 3; }
+.timeline .done .dot { background: var(--brand); border-color: var(--brand); color: #fff; }
+.timeline .now .dot { border-color: var(--brand); }
+.timeline .now .dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); }
+.timeline b { font-weight: 500; display: block; }
+.timeline span { font-size: 13px; color: var(--ink-3); }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14px; }
+.checks li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; }
+.checks .ok svg { color: var(--ok); } .checks .warn svg { color: var(--warn); }
+
+/* returns table */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; font-size: 12px; font-weight: 500; color: var(--ink-3); padding: 12px 20px; background: var(--subtle); border-bottom: 1px solid var(--line); }
+.table td { padding: 14px 20px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.table tbody tr { cursor: pointer; } .table tbody tr:hover td { background: var(--subtle); }
+.item-cell { display: flex; align-items: center; gap: 12px; }
+.tablewrap { overflow-x: auto; }
+
+/* help */
+details.faq { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+details.faq:last-child { border-bottom: 0; }
+details.faq summary { cursor: pointer; font-weight: 500; }
+details.faq p { color: var(--ink-2); margin-top: 8px; max-width: 70ch; }
+/* doorstep pickup */
+.pickup-code { margin-top: 14px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px;
+               border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--subtle); }
+.pickup-code > div { display: grid; gap: 2px; }
+.pickup-code .code { font-size: 26px; font-weight: 600; letter-spacing: .3em; color: var(--ink); }
+.pickup-code p { flex: 1; min-width: 180px; }
+.kv.refund { margin-top: 12px; max-width: 360px; }
 </style>
 </head>
 <body>
-<div class="phone">
-  <header class="bar">
-    <span class="left" id="left"></span>
-    <h1 id="title">My returns</h1>
-    <span class="right"><button class="iconbtn" id="logout" type="button" aria-label="Sign out" title="Sign out"></button></span>
-  </header>
-  <main id="view" aria-live="polite"></main>
-</div>
+<header class="top">
+  <div class="inner">
+    <span id="logo"></span>
+    <nav class="nav" aria-label="Main">
+      <a href="#orders" data-nav="orders" id="nav-orders"></a>
+      <a href="#returns" data-nav="returns" id="nav-returns"></a>
+      <a href="#help" data-nav="help" id="nav-help"></a>
+    </nav>
+    <div class="account">
+      <button class="account-btn" id="acct" type="button" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="menu" id="menu" hidden></div>
+    </div>
+  </div>
+</header>
+<main id="view" aria-live="polite"></main>
 <input type="file" id="picker" accept="image/jpeg,image/png,image/webp" multiple hidden>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=4"></script>
 <script>
 let me = null, orders = [], cfg = {max_photos: 4, max_evidence_rounds: 2, return_window_days: 10}, pollTimer = null;
-let draft = [];          // [{file, url, check}] photos chosen on the New Return screen
-let pickerTarget = null; // "new" or a case id (evidence upload)
+let draft = [], pickerTarget = null;
+// key, label, hint, needs a description
+const REASONS = [
+  ["damaged", "It arrived damaged or defective", "A hole, tear, split seam or other fault.", true],
+  ["stain", "It has a stain or discolouration", "Marks, spots or colour that has run.", true],
+  ["wrong", "It's not the item I ordered", "A different product, size or colour arrived.", true],
+  ["fit", "It doesn't fit", "Unworn, with the original tags.", false],
+  ["mind", "I changed my mind", "Unworn, with the original tags.", false],
+];
+const STEP_LABEL = {get_order: "Order verified", parse_claim: "Return reason reviewed", check_photos: "Photo quality checked",
+  verify_product: "Item matched to your order", detect_defects: "Garment inspected for damage", zoom_in: "Detailed inspection",
+  verify_with_vlm: "Damage independently confirmed", retrieve_policy: "Return policy applied", decide: "Decision made", finalize: "Done"};
+const PROBLEM = {too_small: "Too small", blurry: "Blurry", too_dark: "Too dark", too_bright: "Too bright"};
 
-const STEP_LABEL = {get_order: "Found your order", parse_claim: "Read your description", check_photos: "Checked photo quality",
-  detect_defects: "Looked for damage on the garment", zoom_in: "Took a closer look", verify_with_vlm: "Double-checked the damage",
-  retrieve_policy: "Checked the return policy", decide: "Reached a decision", finalize: "Finished"};
-const PROBLEM = {too_small: "too small", blurry: "blurry", too_dark: "too dark", too_bright: "too bright"};
-const QUICK = [["Hole or tear", "There is a hole in the fabric near the "], ["Stain", "There is a stain on the "],
-               ["Seam came apart", "The seam has split at the "], ["Changed my mind", "I changed my mind, the garment is unworn."]];
+$("logo").innerHTML = logoHTML(false, "/account");
+$("nav-orders").innerHTML = `${icon("package")}<span>Orders</span>`;
+$("nav-returns").innerHTML = `${icon("return")}<span>Returns</span>`;
+$("nav-help").innerHTML = `${icon("help")}<span>Help</span>`;
+document.body.insertAdjacentHTML("beforeend", footerHTML());
 
-$("logout").innerHTML = icon("logout");
-$("logout").onclick = logout;
-
-function setHeader(title, back) {
-  $("title").textContent = title;
-  $("left").innerHTML = back ? `<button class="back" type="button" aria-label="Back to my returns">${icon("back", "")}</button>` : brandMini();
-  if (back) $("left").firstChild.onclick = () => { location.hash = "#home"; };
-}
-const brandMini = () => `<span class="brand"><span class="tag">${icon("tag", "")}</span></span>`;
+function setNav(key) { document.querySelectorAll("[data-nav]").forEach((a) => a.setAttribute("aria-current", a.dataset.nav === key ? "page" : "false")); }
+const orderOf = (id) => orders.find((o) => o.order_id === id) || {};
+const thumbHTML = (img, cls = "") => `<div class="thumb ${cls}">${img ? `<img src="${esc(img)}" alt="">` : icon("package")}</div>`;
 
 function route() {
   clearTimeout(pollTimer);
-  const h = location.hash || "#home";
-  if (h === "#new") return showNew();
-  const m = h.match(/^#case-(\d+)$/);
-  if (m) return showCase(+m[1]);
-  return showHome();
+  window.scrollTo(0, 0);
+  const h = location.hash || "#orders";
+  let m;
+  if ((m = h.match(/^#new-(.+)$/))) return showNew(decodeURIComponent(m[1]));
+  if ((m = h.match(/^#return-(\d+)$/))) return showReturn(+m[1]);
+  if (h === "#returns") return showReturns();
+  if (h === "#help") return showHelp();
+  return showOrders();
 }
 window.addEventListener("hashchange", route);
 
-/* ---------- home: my returns ---------- */
-async function showHome() {
-  setHeader("My returns", false);
+/* ---------------- orders ---------------- */
+async function showOrders() {
+  setNav("orders"); document.title = "Your orders · ReturnGuard";
+  orders = await api("/api/orders");
+  $("view").innerHTML = `
+    <div class="page-head"><div><h1>Your orders</h1><p>Returns are accepted within ${cfg.return_window_days} days of delivery.</p></div></div>
+    <section class="card">${orders.length ? orders.map((o) => {
+      const until = addDays(o.delivered_date, cfg.return_window_days);
+      return `<article class="order">
+        ${thumbHTML(o.image)}
+        <div><h3>${esc(o.product)}</h3>
+          <div class="meta"><span>Order <span class="mono">${esc(o.order_id)}</span></span>${o.colour ? `<span>Colour: ${esc(o.colour)}</span>` : ""}<span>Delivered ${fmtDate(o.delivered_date)}</span></div>
+          <div class="window ${o.window_ok ? "ok" : "closed"}">${o.window_ok ? `Eligible for return until ${fmtDate(until)}` : `Return window closed on ${fmtDate(until)}`}</div></div>
+        <div class="side"><span class="price">${rupees(o.price)}</span>
+          ${o.return_id ? `${statusBadge(o.return_status)}<a class="btn secondary sm" href="#return-${o.return_id}">View return</a>`
+                        : `<a class="btn ${o.window_ok ? "" : "secondary"} sm" href="#new-${encodeURIComponent(o.order_id)}">Return or report a problem</a>`}</div>
+      </article>`;
+    }).join("") : `<div class="empty">${icon("package")}<p>You have no orders yet.</p></div>`}</section>`;
+}
+
+/* ---------------- returns list ---------------- */
+async function showReturns() {
+  setNav("returns"); document.title = "Your returns · ReturnGuard";
   const cases = await api("/api/cases");
+  if (!orders.length) orders = await api("/api/orders");
   $("view").innerHTML = `
-    <section class="hero rise">
-      <h2>Hi ${esc(me.name.split(" ")[0])}</h2>
-      <p>Something wrong with an order? Send a few photos and we'll usually decide in about a minute.</p>
-      <button class="btn coral" id="start" type="button">${icon("plus")} Start a new return</button>
-    </section>
-    <div class="section-title"><span class="label">Your returns</span><span class="small muted">${cases.length || ""}</span></div>
-    ${cases.length ? `<ul class="list">${cases.map((c) => `
-      <li class="rise"><button class="ret" type="button" data-id="${c.id}">
-        ${c.photos[0] ? `<img src="${esc(c.photos[0].url)}" alt="">` : `<span class="ph"></span>`}
-        <span><b>${esc(c.product || c.order_id)}</b><span class="small muted">Case #${c.id} · ${esc(c.created_at.slice(0, 10))}</span></span>
-        <span class="r"><span class="pill ${STATUS_PILL[c.status] || "mute"}">${esc(c.status)}</span></span>
-      </button></li>`).join("")}</ul>`
-    : `<div class="empty"><div class="em">${icon("tag")}</div>No returns yet.<br><span class="small">Start one when something is wrong with an order.</span></div>`}`;
-  $("start").onclick = () => { location.hash = "#new"; };
-  $("view").querySelectorAll(".ret").forEach((b) => b.onclick = () => { location.hash = "#case-" + b.dataset.id; });
-}
-
-/* ---------- S2: new return ---------- */
-function showNew() {
-  setHeader("New return", true);
-  draft = [];
-  const firstOk = (orders.find((o) => o.window_ok) || orders[0] || {}).order_id;
-  $("view").innerHTML = `
-    <form id="newform" novalidate class="rise" style="display:grid;gap:14px">
-      <section class="panel">
-        <label style="margin-top:0">Which order?</label>
-        <div class="orders" role="radiogroup" aria-label="Order">${orders.map((o) => {
-          const left = cfg.return_window_days - o.days_since_delivery;
-          return `<label class="order" style="margin:0;font-weight:400"><input type="radio" name="order" value="${esc(o.order_id)}" ${o.order_id === firstOk ? "checked" : ""}>
-            <span><b>${esc(o.product)}</b><span class="win ${o.window_ok ? "ok" : "late"}">${o.window_ok ? `${left} day${left === 1 ? "" : "s"} left to return` : "Past the return window"}</span>
-            <span class="small muted"> · ${esc(o.order_id)}</span></span>
-            <span class="price">${rupees(o.price)}</span></label>`;
-        }).join("")}</div>
-        <div class="note warn" id="latewarn" hidden style="margin-top:10px">${icon("alert")}<span>This order is past the ${cfg.return_window_days}-day return window, so the return will be declined automatically. You can still appeal it afterwards.</span></div>
-      </section>
-      <section class="panel">
-        <label for="reason" style="margin-top:0">What's wrong?</label>
-        <textarea id="reason" maxlength="1000" placeholder="For example: there is a hole near the collar, it was like this when I opened the package."></textarea>
-        <div class="counter" id="count">0 / 1000</div>
-        <div class="quick">${QUICK.map(([l, t], i) => `<button type="button" data-q="${i}">${esc(l)}</button>`).join("")}</div>
-      </section>
-      <section class="panel">
-        <label id="photoslabel" style="margin-top:0">Photos (0 of ${cfg.max_photos})</label>
-        <div class="photos" id="photos"></div>
-        <div class="checks" id="checks"></div>
-      </section>
-      <div class="tips">${icon("camera")}<span>Add one photo of the <b>whole garment</b> laid flat, and a <b>close-up</b> of any damage in good light.</span></div>
-      <button class="btn block coral" id="submit" type="submit">${icon("send")} Submit return</button>
-      <div id="err" role="alert"></div>
-    </form>`;
-  $("reason").oninput = () => { $("count").textContent = `${$("reason").value.length} / 1000`; };
-  const late = () => { const v = (document.querySelector("input[name=order]:checked") || {}).value;
-                       $("latewarn").hidden = !orders.some((o) => o.order_id === v && !o.window_ok); };
-  document.querySelectorAll("input[name=order]").forEach((r) => r.onchange = late); late();
-  $("view").querySelectorAll("[data-q]").forEach((b) => b.onclick = () => {
-    $("reason").value = QUICK[+b.dataset.q][1]; $("reason").focus(); $("reason").oninput();
+    <div class="page-head"><div><h1>Your returns</h1><p>Requests you have made, newest first.</p></div></div>
+    <section class="card">${cases.length ? `<div class="tablewrap"><table class="table">
+      <thead><tr><th class="wide-only">Return</th><th>Item</th><th class="wide-only">Requested</th><th>Status</th><th class="wide-only"></th></tr></thead>
+      <tbody>${cases.map((c) => `<tr data-id="${c.id}" tabindex="0">
+        <td class="mono wide-only">${caseNo(c.id)}</td>
+        <td><div class="item-cell">${thumbHTML(orderOf(c.order_id).image, "sm")}<span>${esc(c.product || c.order_id)}<small class="phone-only">${caseNo(c.id)} · ${fmtDate(c.created_at)}</small></span></div></td>
+        <td class="wide-only">${fmtDate(c.created_at)}</td><td>${statusBadge(c.display_status || c.status)}</td><td class="wide-only" style="text-align:right;color:var(--ink-3)">${icon("chevron")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty">${icon("return")}<p>You haven't requested any returns.</p><p class="small" style="margin-top:6px"><a href="#orders">Go to your orders</a></p></div>`}</section>`;
+  $("view").querySelectorAll("tbody tr").forEach((tr) => {
+    const open = () => { location.hash = "#return-" + tr.dataset.id; };
+    tr.onclick = open; tr.onkeydown = (e) => { if (e.key === "Enter") open(); };
   });
-  renderDraft();
-  $("newform").addEventListener("submit", submitNew);
 }
 
-function renderDraft() {
-  $("photoslabel").textContent = `Photos (${draft.length} of ${cfg.max_photos})`;
-  $("photos").innerHTML = draft.map((d, i) => `
-    <button type="button" class="tile${d.check && !d.check.ok ? " bad" : ""}" data-i="${i}" aria-label="Remove photo ${i + 1}">
-      <img src="${d.url}" alt="Photo ${i + 1}"><span class="x">${icon("x", "")}</span>
-      ${d.check ? `<span class="q ${d.check.ok ? "ok" : "bad"}">${d.check.ok ? "OK" : "Retake"}</span>` : ""}</button>`).join("")
-    + (draft.length < cfg.max_photos ? `<button type="button" class="tile add" id="add">${icon("camera", "")}Add photo</button>` : "");
-  $("photos").querySelectorAll("[data-i]").forEach((b) => b.onclick = () => { draft.splice(+b.dataset.i, 1); renderDraft(); });
-  if ($("add")) $("add").onclick = () => { pickerTarget = "new"; $("picker").click(); };
-  $("checks").innerHTML = draft.map((d, i) => !d.check ? `<span class="muted">img ${i + 1} checking…</span>`
-    : d.check.ok ? `<span class="ok">✓ img ${i + 1} OK</span>`
-    : `<span class="warn">⚠ img ${i + 1} ${d.check.problems.map((p) => PROBLEM[p] || p).join(", ")} - retake</span>`).join("");
+/* ---------------- new return ---------------- */
+async function showNew(orderId) {
+  setNav("orders"); document.title = "Return an item · ReturnGuard";
+  if (!orders.length) orders = await api("/api/orders");
+  const o = orderOf(orderId);
+  if (!o.order_id) { $("view").innerHTML = `<div class="error">This order is not on your account.</div>`; return; }
+  draft = [];
+  const until = addDays(o.delivered_date, cfg.return_window_days);
+  $("view").innerHTML = `
+    <div><div class="crumbs"><a href="#orders">Orders</a>${icon("chevron")}<span>Return an item</span></div>
+      <div class="page-head"><div><h1>Return an item</h1><p>Tell us what's wrong and add photos. Most requests are decided within a few minutes.</p></div></div></div>
+    <div class="cols">
+      <form class="card" id="form" novalidate>
+        <section class="form-section"><h2><span class="n">1</span>Why are you returning this item?</h2>
+          <div class="reasons" role="radiogroup" aria-label="Reason">${REASONS.map(([k, t, d]) => `
+            <label class="reason"><input type="radio" name="reason" value="${k}"><div><b>${esc(t)}</b><span>${esc(d)}</span></div></label>`).join("")}</div></section>
+        <section class="form-section"><h2><span class="n">2</span>Describe the problem</h2>
+          <div class="field"><label for="details" class="label-text">Details <span class="faint" id="optional">(optional)</span></label>
+            <textarea id="details" maxlength="900" placeholder="For example: there is a hole near the left cuff. It was like this when I opened the package."></textarea>
+            <div class="counter" id="count">0 / 900</div></div></section>
+        <section class="form-section"><h2><span class="n">3</span>Add photos</h2>
+          <p class="hint" id="photohint">Add a photo of the whole item laid flat, and a close-up of any damage, in good light. Up to ${cfg.max_photos} photos.</p>
+          <div class="drop" id="drop" tabindex="0" role="button" aria-label="Add photos"><span class="ic">${icon("upload")}</span>
+            <span><b>Click to upload</b> or drag and drop</span><span class="hint">JPG, PNG or WebP, up to 8 MB each</span></div>
+          <div class="tiles" id="tiles"></div></section>
+        ${o.window_ok ? "" : `<div style="padding:0 24px 20px"><div class="alert warn">${icon("alert")}<div>This order was delivered more than ${cfg.return_window_days} days ago, so the return will be declined automatically. You can ask for a second review afterwards.</div></div></div>`}
+        <div id="err" role="alert" style="padding:0 24px"></div>
+        <div class="form-foot"><a class="btn secondary" href="#orders">Cancel</a><button class="btn" id="submit" type="submit">Submit return request</button></div>
+      </form>
+      <aside class="stack">
+        <section class="card summary"><div class="card-head"><h3>Item</h3></div><div class="card-body">
+          <div class="item">${thumbHTML(o.image)}<div><b>${esc(o.product)}</b><div class="small muted">${o.colour ? esc(o.colour) + " · " : ""}${rupees(o.price)}</div></div></div>
+          <dl class="kv"><dt>Order</dt><dd class="mono">${esc(o.order_id)}</dd><dt>Delivered</dt><dd>${fmtDate(o.delivered_date)}</dd>
+            <dt>Return by</dt><dd>${fmtDate(until)}</dd></dl></div></section>
+        <section class="card"><div class="card-head"><h3>What happens next</h3></div><div class="card-body">
+          <ol class="steps-list"><li>We check that your photos are clear and show the item from this order.</li>
+            <li>We inspect the photos for the problem you describe.</li>
+            <li>You get a decision here, usually within minutes. Some requests are checked by our team.</li></ol></div></section>
+      </aside>
+    </div>`;
+  $("details").oninput = () => { $("count").textContent = `${$("details").value.length} / 900`; };
+  document.querySelectorAll("input[name=reason]").forEach((r) => r.onchange = () => {
+    const needs = REASONS.find((x) => x[0] === r.value)[3];
+    $("optional").hidden = needs;
+    $("photohint").textContent = needs ? `Add a photo of the whole item laid flat, and a close-up of the problem, in good light. Up to ${cfg.max_photos} photos.`
+                                       : `Add a photo of the whole item laid flat, showing it is unworn. Up to ${cfg.max_photos} photos.`;
+  });
+  const drop = $("drop");
+  drop.onclick = () => { pickerTarget = "new"; $("picker").click(); };
+  drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); drop.click(); } };
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => addDraft([...e.dataTransfer.files]));
+  $("form").addEventListener("submit", (e) => submitNew(e, o));
+  renderTiles();
+}
+
+function renderTiles() {
+  $("tiles").innerHTML = draft.map((d, i) => {
+    const st = !d.check ? ["", `<span class="spin"></span>Checking…`] : d.check.ok ? ["ok", `${icon("check")}Looks good`]
+             : ["bad", `${icon("alert")}${d.check.problems.map((p) => PROBLEM[p] || p).join(", ")}. Please retake`];
+    return `<div class="tile ${st[0]}"><div class="im"><img src="${d.url}" alt="Photo ${i + 1}">
+      <button type="button" class="rm" data-i="${i}" aria-label="Remove photo ${i + 1}">${icon("x")}</button></div><span class="st ${st[0]}">${st[1]}</span></div>`;
+  }).join("");
+  $("tiles").querySelectorAll(".rm").forEach((b) => b.onclick = () => { draft.splice(+b.dataset.i, 1); renderTiles(); });
+  $("drop").hidden = draft.length >= cfg.max_photos;
+}
+
+function addDraft(files) {
+  for (const f of files.slice(0, cfg.max_photos - draft.length)) {
+    const d = {file: f, url: URL.createObjectURL(f), check: null};
+    draft.push(d); renderTiles();
+    const fd = new FormData(); fd.append("image", f);
+    api("/api/precheck", {method: "POST", body: fd}).then((q) => { d.check = q; renderTiles(); })
+      .catch((err) => { d.check = {ok: false, problems: [err.message]}; renderTiles(); });
+  }
 }
 
 $("picker").addEventListener("change", async (e) => {
   const files = [...e.target.files]; e.target.value = "";
-  if (pickerTarget === "new") {
-    for (const f of files.slice(0, cfg.max_photos - draft.length)) {
-      const d = {file: f, url: URL.createObjectURL(f), check: null};
-      draft.push(d); renderDraft();
-      const fd = new FormData(); fd.append("image", f);
-      api("/api/precheck", {method: "POST", body: fd}).then((q) => { d.check = q; renderDraft(); })
-        .catch((err) => { d.check = {ok: false, problems: [err.message]}; renderDraft(); });
-    }
-  } else if (pickerTarget) {
-    await sendEvidence(pickerTarget, files.slice(0, cfg.max_photos));
-  }
+  if (pickerTarget === "new") addDraft(files);
+  else if (pickerTarget) await sendEvidence(pickerTarget, files.slice(0, cfg.max_photos));
 });
 
-async function submitNew(e) {
+async function submitNew(e, o) {
   e.preventDefault();
   $("err").innerHTML = "";
-  const reason = $("reason").value.trim(), order = (document.querySelector("input[name=order]:checked") || {}).value;
-  if (!order) return $("err").innerHTML = `<div class="error">Choose an order.</div>`;
-  if (!reason) return $("err").innerHTML = `<div class="error">Describe what is wrong with the item.</div>`;
-  if (!draft.length) return $("err").innerHTML = `<div class="error">Add at least one photo.</div>`;
+  const sel = document.querySelector("input[name=reason]:checked"), details = $("details").value.trim();
+  const r = sel && REASONS.find((x) => x[0] === sel.value);
+  if (!r) return $("err").innerHTML = `<div class="error">Choose why you are returning the item.</div>`;
+  if (r[3] && !details) return $("err").innerHTML = `<div class="error">Describe the problem so we can check it.</div>`;
+  if (!draft.length) return $("err").innerHTML = `<div class="error">Add at least one photo of the item.</div>`;
   const fd = new FormData();
-  fd.append("order_id", order); fd.append("reason", reason);
+  fd.append("order_id", o.order_id); fd.append("reason", details ? `${r[1]}. ${details}` : r[1]);
   draft.forEach((d) => fd.append("images", d.file));
-  $("submit").disabled = true;
+  $("submit").disabled = true; $("submit").innerHTML = `<span class="spin"></span>Submitting…`;
   try {
     const c = await api("/api/cases", {method: "POST", body: fd});
-    location.hash = "#case-" + c.id;
+    orders = [];
+    location.hash = "#return-" + c.id;
   } catch (err) {
-    $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`;
-  } finally { if ($("submit")) $("submit").disabled = false; }
+    $("err").innerHTML = `<div class="error" style="margin-bottom:16px">${esc(err.message)}</div>`;
+    $("submit").disabled = false; $("submit").textContent = "Submit return request";
+  }
 }
 
-/* ---------- S3: verifying and decision screens ---------- */
-function stepper(stage) {
-  const names = ["Submitted", "Verifying", "Decision"];
-  return `<div class="stepper"><span class="fill" style="width:${stage >= 3 ? 68 : stage === 2 ? 34 : 0}%"></span>${names.map((n, i) => {
-    const s = i + 1 < stage ? "done" : i + 1 === stage ? (stage === 3 ? "done" : "now") : "";
-    return `<div class="st ${s}"><span class="dot">${s === "done" ? icon("check", "i") : i + 1}</span>${n}</div>`;
-  }).join("")}</div>`;
-}
-const checkList = (checks) => checks.map((k) =>
-  `<li><span class="mk ${k.ok ? "ok" : "warn"}">${icon(k.ok ? "check" : "alert", "i")}</span><span>${esc(k.text)}</span></li>`).join("");
-
-async function showCase(id) {
-  setHeader(`Case #${id}`, true);
-  let c;
-  try { c = await api(`/api/cases/${id}`); } catch (err) { $("view").innerHTML = `<div class="error">${esc(err.message)}</div>`; return; }
-  const v = $("view");
+/* ---------------- return detail ---------------- */
+function outcomeHTML(c) {
+  const resolution = c.resolution === "store_credit" ? "store credit" : "a full refund or a free replacement";
   if (c.status === "Checking") {
     const done = c.steps.filter((s, i, a) => i >= a.map((x) => x.step).lastIndexOf("get_order"));
-    v.innerHTML = `${stepper(2)}
-      <section class="result"><div class="ring"><span class="spin" aria-hidden="true"></span></div>
-        <div class="title">Verifying your return</div>
-        <p class="lead">Our agent is checking your photos against your description. This usually takes under a minute.</p></section>
-      <section class="card"><div class="label">Agent steps</div><ul class="timeline">
-        ${done.map((s) => `<li><span class="mk ok">${icon("check", "i")}</span><span>${esc(STEP_LABEL[s.step] || s.step)}</span></li>`).join("")}
-        <li><span class="mk now"></span><span class="muted">Working…</span></li></ul></section>`;
-    pollTimer = setTimeout(() => showCase(id), 1200);
-    return;
+    return `<div class="outcome info"><span class="ic"><span class="spin"></span></span><div><h2>We're checking your request</h2>
+      <p>This usually takes less than a minute. You can leave this page; the result will be saved here.</p>
+      <ul class="progress">${done.map((s) => `<li class="done">${icon("check")}${esc(STEP_LABEL[s.step] || s.step)}</li>`).join("")}
+        <li><span class="spin"></span>In progress</li></ul></div></div>`;
   }
-  const thumbs = c.photos.length ? `<div class="mythumbs">${c.photos.map((p) => `<img src="${esc(p.url)}" alt="Your photo">`).join("")}</div>` : "";
-  const product = esc(c.product || c.order_id);
-  if (c.status === "Approved") {
-    const res = c.resolution === "store_credit" ? "Store credit" : "Full refund or a free replacement";
-    v.innerHTML = `${stepper(3)}
-      <section class="result rise"><div class="badge ok">${icon("check", "i")}</div><div class="title ok">You're approved!</div>
-        <p class="lead">${esc(c.message || "")}</p></section>
-      <section class="card"><div class="label">What we found</div><ul>${checkList(c.checks)}</ul></section>
-      <div class="note ok">${icon("tag")}<span><b>${esc(res)}</b> for your ${product}.${c.decided_by === "reviewer" ? " Approved by our returns team." : ""}<br><span class="small">Ticket <span class="mono">${esc(c.ticket_id || "")}</span></span></span></div>
-      ${thumbs}
-      <button class="btn block ghost" type="button" onclick="location.hash='#home'">Back to my returns</button>`;
-  } else if (c.status === "Photos needed") {
+  if (c.status === "Approved" && c.pickup) return pickupHTML(c);
+  if (c.status === "Approved") return `<div class="outcome ok"><span class="ic">${icon("check")}</span><div><h2>Your return is approved</h2>
+      <p>You will receive ${resolution}.${c.decided_by === "reviewer" ? " Our returns team approved this request." : ""}</p>
+      <p class="small faint" style="margin-top:10px">Reference <span class="mono">${esc(c.ticket_id || caseNo(c.id))}</span></p></div></div>`;
+  if (c.status === "Photos needed") {
     const n = Math.min(c.evidence_rounds + 1, c.max_evidence_rounds);
-    v.innerHTML = `${stepper(2)}
-      <section class="result rise"><div class="badge warn">${icon("camera", "i")}</div><div class="title warn">One more photo needed</div>
-        <p class="lead">We couldn't confirm everything from the photos you sent.</p></section>
-      <section class="card"><div class="label">What we checked</div><ul>${checkList(c.checks)}</ul></section>
-      <div class="note warn">${icon("alert")}<span>${esc(c.request || c.message || "Please send another photo.")}</span></div>
-      <button class="btn block warn" type="button" id="upload">${icon("camera")} Upload photo</button>
-      <div id="err" role="alert"></div>
-      <p class="foot">Request ${n} of ${c.max_evidence_rounds}${c.decided_by === "reviewer" ? " · asked by our returns team" : ""}</p>`;
-    $("upload").onclick = () => { pickerTarget = id; $("picker").click(); };
-  } else if (c.status === "With reviewer") {
-    v.innerHTML = `${stepper(3)}
-      <section class="result rise"><div class="badge info">${icon("clock", "i")}</div><div class="title">A specialist is checking your return</div>
-        <p class="lead">${esc(c.message || "")}</p></section>
-      <section class="card"><div class="label">What we checked</div><ul>${checkList(c.checks)}</ul></section>
-      ${thumbs}<p class="foot">This page updates when there is a decision.</p>`;
-    pollTimer = setTimeout(() => showCase(id), 8000);
-  } else if (c.status === "Rejected") {
-    v.innerHTML = `${stepper(3)}
-      <section class="result rise"><div class="badge mute">${icon("info", "i")}</div><div class="title">This return wasn't approved</div>
-        <p class="lead">${esc(c.message || "A specialist reviewed your photos.")}</p></section>
-      <section class="card"><div class="label">What was reviewed</div><ul>${checkList(c.checks)}
-        ${c.review_note ? `<li><span class="mk bad">${icon("x", "i")}</span><span>${esc(c.review_note)}</span></li>` : ""}</ul></section>
-      <div class="note info">${icon("info")}<span>If you believe this is wrong, you can appeal. A different specialist will take a second look.</span></div>
-      <button class="btn block" type="button" id="appeal">${icon("refresh")} Appeal this decision</button><div id="err" role="alert"></div>`;
-    $("appeal").onclick = async () => {
-      try { await postJSON(`/api/cases/${id}/appeal`, {note: ""}); showCase(id); }
-      catch (err) { $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
-    };
+    return `<div class="outcome warn"><span class="ic">${icon("camera")}</span><div><h2>We need another photo</h2>
+      <p>${esc(c.request || c.message || "Please send another photo of the item.")}</p>
+      <div class="actions"><button class="btn" type="button" id="upload">${icon("upload")}Upload photo</button></div>
+      <p class="small faint" style="margin-top:10px">Request ${n} of ${c.max_evidence_rounds}${c.decided_by === "reviewer" ? " · from our returns team" : ""}</p>
+      <div id="err" role="alert" style="margin-top:10px"></div></div></div>`;
   }
+  if (c.status === "With reviewer") return `<div class="outcome info"><span class="ic">${icon("clock")}</span><div><h2>Our team is reviewing your request</h2>
+      <p>${esc(c.message || "We'll update this page when there is a decision.")}</p></div></div>`;
+  if (c.status === "Rejected") return `<div class="outcome bad"><span class="ic">${icon("info")}</span><div><h2>This return wasn't approved</h2>
+      <p>${esc(c.message || "")}</p>${c.review_note ? `<p class="small" style="margin-top:8px">Note from our team: ${esc(c.review_note)}</p>` : ""}
+      <div class="actions"><button class="btn secondary" type="button" id="appeal">${icon("refresh")}Ask for a second review</button></div>
+      <div id="err" role="alert" style="margin-top:10px"></div></div></div>`;
+  return "";
+}
+
+function pickupHTML(c) {
+  const p = c.pickup, credit = c.resolution === "store_credit", amount = orderOf(c.order_id).price;
+  const ref = `<p class="small faint" style="margin-top:10px">Reference <span class="mono">${esc(c.ticket_id || caseNo(c.id))}</span></p>`;
+  if (p.status === "picked_up") return `<div class="outcome ok"><span class="ic">${icon("check")}</span><div>
+      <h2>${credit ? "Store credit issued" : "Refund issued"}</h2><p>${esc(c.message || "")}</p>
+      <dl class="kv refund"><dt>Amount</dt><dd>${rupees(p.refund_amount)}</dd><dt>Paid to</dt><dd>${credit ? "Your store credit" : "Original payment method"}</dd>
+        <dt>Collected</dt><dd>${fmtDateTime(p.verified_at)}</dd></dl>${ref}</div></div>`;
+  return `<div class="outcome ok"><span class="ic">${icon("truck")}</span><div>
+      <h2>Your return is approved</h2>
+      <p>${p.attempts > 1 ? "We missed you on our last visit. " : ""}A pickup partner will collect the item on <b>${fmtDate(p.scheduled_for)}, ${esc(p.slot)}</b>. Please keep it ready, ideally in its original packaging.</p>
+      <div class="pickup-code"><div><span class="section-label">Pickup code</span><span class="code mono">${esc(p.code)}</span></div>
+        <p class="small muted">Give this code to the pickup partner only after they have checked the item.</p></div>
+      <p class="small muted" style="margin-top:12px">Your ${credit ? "store credit" : "refund"} of ${rupees(amount)} is issued as soon as the partner confirms the item at your door.${c.decided_by === "reviewer" ? " Our returns team approved this request." : ""}</p>${ref}</div></div>`;
+}
+
+function timelineHTML(c) {
+  const decided = ["Approved", "Rejected"].includes(c.status), waiting = c.status === "Photos needed";
+  const items = [
+    ["done", "Request submitted", fmtDateTime(c.created_at)],
+    [c.status === "Checking" ? "now" : "done", "Photos checked", c.status === "Checking" ? "In progress" : ""],
+    [waiting || c.status === "With reviewer" ? "now" : (decided ? "done" : ""), waiting ? "Waiting for your photo" : "Review",
+     c.status === "With reviewer" ? "With our returns team" : ""],
+    [decided ? "done" : "", decided ? (c.status === "Approved" ? "Approved" : "Not approved") : "Decision", decided ? fmtDateTime(c.updated_at) : ""],
+  ];
+  const p = c.pickup;
+  if (c.status === "Approved" && p) {  // R9: collected and checked at the door, then the refund
+    const done = p.status === "picked_up";
+    items.push([done ? "done" : "now", "Pickup", done ? "" : `${fmtDate(p.scheduled_for)}, ${p.slot}`],
+               [done ? "done" : "", "Checked at your door and collected", done ? fmtDateTime(p.verified_at) : ""],
+               [done ? "done" : "", c.resolution === "store_credit" ? "Store credit issued" : "Refund issued", done ? fmtDateTime(p.refunded_at) : ""]);
+  }
+  return `<ol class="timeline">${items.map(([s, t, d]) => `<li class="${s}"><span class="dot">${s === "done" ? icon("check") : ""}</span><div><b>${esc(t)}</b>${d ? `<span>${esc(d)}</span>` : ""}</div></li>`).join("")}</ol>`;
+}
+
+async function showReturn(id) {
+  setNav("returns");
+  let c;
+  try { c = await api(`/api/cases/${id}`); } catch (err) { $("view").innerHTML = `<div class="error">${esc(err.message)}</div>`; return; }
+  if (!orders.length) orders = await api("/api/orders");
+  document.title = `Return ${caseNo(c.id)} · ReturnGuard`;
+  const o = orderOf(c.order_id), MARK = {ok: "check", warn: "alert", bad: "x"};
+  $("view").innerHTML = `
+    <div><div class="crumbs"><a href="#returns">Returns</a>${icon("chevron")}<span class="mono">${caseNo(c.id)}</span></div>
+      <div class="page-head"><div><h1>Return <span class="mono">${caseNo(c.id)}</span></h1><p>Requested ${fmtDateTime(c.created_at)}</p></div>${statusBadge(c.display_status || c.status)}</div></div>
+    <div class="cols">
+      <div class="stack">
+        <section class="card">${outcomeHTML(c)}</section>
+        ${c.status !== "Checking" && c.checks.length ? `<section class="card"><div class="card-head"><h3>What we checked</h3></div><div class="card-body">
+          <ul class="checks">${c.checks.map((k) => `<li class="${k.ok ? "ok" : "warn"}">${icon(k.ok ? "check" : "alert")}<span>${esc(k.text)}</span></li>`).join("")}</ul></div></section>` : ""}
+        <section class="card"><div class="card-head"><h3>Your photos</h3><span class="small faint">${c.photos.length} uploaded</span></div><div class="card-body">
+          <div class="tiles">${c.photos.map((p, i) => { const s = p.status || {state: "", text: ""};
+            return `<div class="tile ${s.state}"><div class="im"><img src="${esc(p.url)}" alt="Your photo ${i + 1}"></div>
+              ${s.state ? `<span class="st ${s.state}">${icon(MARK[s.state])}${esc(s.text)}</span>` : ""}</div>`; }).join("")}</div></div></section>
+      </div>
+      <aside class="stack">
+        <section class="card summary"><div class="card-head"><h3>Item</h3></div><div class="card-body">
+          <div class="item">${thumbHTML(o.image)}<div><b>${esc(c.product || c.order_id)}</b><div class="small muted">${o.colour ? esc(o.colour) + " · " : ""}${o.price ? rupees(o.price) : ""}</div></div></div>
+          <dl class="kv"><dt>Order</dt><dd class="mono">${esc(c.order_id)}</dd><dt>Return</dt><dd class="mono">${caseNo(c.id)}</dd></dl>
+          <div><div class="section-label" style="margin-bottom:6px">Your description</div><p class="small muted">${esc(c.reason)}</p></div></div></section>
+        <section class="card"><div class="card-head"><h3>Progress</h3></div><div class="card-body">${timelineHTML(c)}</div></section>
+      </aside>
+    </div>`;
+  if ($("upload")) $("upload").onclick = () => { pickerTarget = id; $("picker").click(); };
+  if ($("appeal")) $("appeal").onclick = async () => {
+    try { await postJSON(`/api/cases/${id}/appeal`, {note: ""}); showReturn(id); }
+    catch (err) { $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
+  };
+  if (c.status === "Checking") pollTimer = setTimeout(() => showReturn(id), 1500);
+  else if (c.status === "With reviewer") pollTimer = setTimeout(() => showReturn(id), 10000);
+  else if (c.pickup && c.pickup.status === "scheduled") pollTimer = setTimeout(() => showReturn(id), 8000);
 }
 
 async function sendEvidence(id, files) {
   if (!files.length) return;
   const fd = new FormData(); files.forEach((f) => fd.append("images", f));
-  try { await api(`/api/cases/${id}/evidence`, {method: "POST", body: fd}); showCase(id); }
+  try { await api(`/api/cases/${id}/evidence`, {method: "POST", body: fd}); showReturn(id); }
   catch (err) { if ($("err")) $("err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
+}
+
+/* ---------------- help ---------------- */
+function showHelp() {
+  setNav("help"); document.title = "Help · ReturnGuard";
+  const faq = [
+    ["How long does a decision take?", "Most requests are decided within a few minutes of submitting them. Some are checked by our returns team, which usually takes up to one working day. You can follow the progress on the return's page."],
+    ["What photos should I take?", "One photo of the whole item laid flat in good light, and a close-up of any damage. Avoid screenshots, filters and very dark photos. If a photo is unclear we'll tell you before you submit."],
+    ["Why was I asked for another photo?", "Either the photo wasn't clear enough, the problem you described wasn't visible, or the photo didn't seem to show the item from your order. The request explains which, and you can send up to two more photos."],
+    ["How does the pickup work?", "Once your return is approved, a pickup partner collects the item, usually the next day. At your door they check that it's the item from your order and that it matches what you reported (or that it's unworn with its tags), then ask for the pickup code shown on your return page. Your refund or store credit is issued as soon as they confirm. If you're not at home, they'll come again the next day."],
+    ["How are refunds paid?", `Damaged or faulty items get a full refund or a free replacement. Items returned because they don't fit or you changed your mind get store credit. Returns are accepted within ${cfg.return_window_days} days of delivery.`],
+    ["My return wasn't approved. What can I do?", "Open the return and choose “Ask for a second review”. A different member of our team will look at it."],
+  ];
+  $("view").innerHTML = `
+    <div class="page-head"><div><h1>Help</h1><p>Answers to common questions about returns.</p></div><a class="btn secondary" href="/policy">${icon("file")}Read the return policy</a></div>
+    <section class="card">${faq.map(([q, a]) => `<details class="faq"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</section>`;
+}
+
+/* ---------------- account menu ---------------- */
+function accountMenu() {
+  $("acct").innerHTML = `<span class="avatar">${esc(initials(me.name))}</span><span class="nm">${esc(me.name)}</span>${icon("down")}`;
+  $("menu").innerHTML = `<div class="who"><b>${esc(me.name)}</b><div class="xs faint">${esc(me.username)}</div></div>
+    <button type="button" id="signout">${icon("logout")}Sign out</button>`;
+  $("acct").onclick = (e) => { e.stopPropagation(); const open = $("menu").hidden; $("menu").hidden = !open; $("acct").setAttribute("aria-expanded", open); };
+  document.addEventListener("click", () => { $("menu").hidden = true; $("acct").setAttribute("aria-expanded", "false"); });
+  $("signout").onclick = logout;
 }
 
 (async () => {
   me = await api("/api/me");
-  if (me.role !== "customer") { location.href = "/review"; return; }
-  [orders, cfg] = await Promise.all([api("/api/orders"), api("/api/config")]);
+  if (me.role !== "customer") { location.href = ROLE_HOME[me.role] || "/login"; return; }
+  cfg = await api("/api/config");
+  accountMenu();
   route();
 })();
 </script>

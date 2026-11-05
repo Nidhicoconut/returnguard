@@ -7,20 +7,20 @@ from contextlib import contextmanager
 
 from . import config, security
 
-SCHEMA_VERSION = 2  # 1 = the first prototype (no users, one photo per case)
+SCHEMA_VERSION = 4  # 1 = first prototype (no users); 2 = multi-page app; 3 = orders have sku and colour; 4 = doorstep pickups
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL, name TEXT, role TEXT NOT NULL CHECK (role IN ('customer', 'reviewer')),
-    password_hash TEXT NOT NULL, created_at TEXT
+    username TEXT UNIQUE NOT NULL, name TEXT, role TEXT NOT NULL CHECK (role IN ('customer', 'reviewer', 'courier')),
+    password_hash TEXT NOT NULL, created_at TEXT, address TEXT
 );
 CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS orders (
     order_id TEXT PRIMARY KEY, user_id INTEGER, customer TEXT, product TEXT, product_type TEXT,
-    category TEXT, price REAL, delivered_date TEXT
+    category TEXT, price REAL, delivered_date TEXT, sku TEXT, colour TEXT
 );
 CREATE TABLE IF NOT EXISTS cases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     case_id INTEGER, ts TEXT, actor TEXT, action TEXT, detail TEXT
 );
+CREATE TABLE IF NOT EXISTS pickups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER UNIQUE, courier_id INTEGER, status TEXT, scheduled_for TEXT, slot TEXT, code TEXT, attempts INTEGER DEFAULT 1,
+    checks TEXT, note TEXT, photo TEXT, failure_reason TEXT, verified_at TEXT, refund_amount REAL, refunded_at TEXT,
+    created_at TEXT, updated_at TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_cases_user ON cases (user_id);
 CREATE INDEX IF NOT EXISTS idx_media_case ON media (case_id);
 CREATE INDEX IF NOT EXISTS idx_calls_case ON tool_calls (case_id);
@@ -62,7 +68,14 @@ DEMO_USERS = [
     ("ravi", "Ravi Kumar", "customer", "demo1234"),
     ("neha", "Neha Sharma", "customer", "demo1234"),
     ("reviewer", "Return desk", "reviewer", "review1234"),
+    ("courier", "Arjun Rao", "courier", "pickup1234"),  # pickup partner: collects approved returns and checks them at the door
 ]
+# Made-up pickup addresses for the demo customers.
+ADDRESSES = {
+    "asha": "Flat 4B, Lakeview Residency, 12th Main Road, Indiranagar, Bengaluru 560038",
+    "ravi": "221 Palm Grove Apartments, Koramangala 5th Block, Bengaluru 560095",
+    "neha": "House 18, 3rd Cross, Jayanagar 4th Block, Bengaluru 560011",
+}
 
 
 def now() -> str:
@@ -85,17 +98,17 @@ def _days_ago(n: int) -> str:
 
 
 def _orders():
-    # (order_id, username, product, product_type, price, days since delivery)
+    # (order_id, username, product, product_type, price, days since delivery, sku, colour or None for any)
+    # The demo products are real Amazon Fashion listings: the SKU is the product's parent ASIN, its listing photos are
+    # in demo_amazon/catalog/<sku>/ and a damaged customer photo of each is in demo_amazon/customer_photos/
+    # (Amazon Reviews 2023, research use only; see demo_amazon/README.md). The colour is the variant bought.
     return [
-        ("ORD-2001", "asha", "Cotton T-Shirt", "t-shirt", 799, 3),
-        ("ORD-2002", "asha", "Wool Sweater", "sweater", 2499, 5),
-        ("ORD-2003", "asha", "Slim Fit Jeans", "jeans", 1999, 25),
-        ("ORD-2004", "ravi", "Formal Trousers", "trousers", 1899, 4),
-        ("ORD-2005", "ravi", "Linen Shirt", "shirt", 1499, 2),
-        ("ORD-2006", "ravi", "Down Winter Jacket", "jacket", 6999, 6),
-        ("ORD-2007", "neha", "Floral Midi Dress", "dress", 2199, 7),
-        ("ORD-2008", "neha", "Cotton Socks, pack of 3", "socks", 399, 3),
-        ("ORD-2009", "neha", "Fleece Hoodie", "hoodie", 1799, 1),
+        ("ORD-3001", "asha", "Women's V-Neck Crop Sweater", "sweater", 1299, 3, "B08CRKG11D", "white"),
+        ("ORD-3002", "asha", "SheIn Mock Neck Ribbed Knit Tee", "t-shirt", 899, 4, "B07MP31CQB", "army green"),
+        ("ORD-3003", "ravi", "Cable Knit Sweater Set (hoodie crop top and sweatpants)", "sweater set", 2799, 2, "B0BK95GYJ2", "black"),
+        ("ORD-3004", "ravi", "Zexxxy Striped Short-Sleeve Pyjama Set", "pyjama set", 1099, 5, "B07D2C7Q8S", "grey"),
+        ("ORD-3005", "neha", "Hue Chevron Quilted Control-Top Tights", "tights", 1499, 3, "B01IW8LO0G", "navy"),
+        ("ORD-3006", "neha", "Delia's Girls Thermal Knit Shirt and Pant Set, 2-pack", "thermal set", 1199, 6, "B0773WMP4K", "lavender and pink"),
     ]
 
 
@@ -113,9 +126,17 @@ def seed(reset: bool = False) -> None:
             else:
                 ids[username] = (row["id"], name)
         # OR IGNORE: existing databases pick up orders added to this list later.
-        c.executemany("INSERT OR IGNORE INTO orders VALUES (?,?,?,?,?,?,?,?)", [
-            (oid, ids[u][0], ids[u][1], product, ptype, "Clothing", price, _days_ago(days))
-            for oid, u, product, ptype, price, days in _orders()])
+        c.executemany("INSERT OR IGNORE INTO orders (order_id, user_id, customer, product, product_type, category, price, "
+                      "delivered_date, sku, colour) VALUES (?,?,?,?,?,?,?,?,?,?)", [
+            (oid, ids[u][0], ids[u][1], product, ptype, "Clothing", price, _days_ago(days), sku, colour)
+            for oid, u, product, ptype, price, days, sku, colour in _orders()])
+        c.executemany("UPDATE users SET address = ? WHERE username = ? AND address IS NULL", [(a, u) for u, a in ADDRESSES.items()])
+        c.executemany("UPDATE orders SET sku = ?, colour = ? WHERE order_id = ? AND sku IS NULL",
+                      [(sku, colour, oid) for oid, *_, sku, colour in _orders()])
+        # The demo order list is defined here: drop orders no longer in it, unless a case refers to them.
+        keep = [o[0] for o in _orders()]
+        c.execute(f"DELETE FROM orders WHERE order_id NOT IN ({','.join('?' * len(keep))}) "
+                  "AND order_id NOT IN (SELECT order_id FROM cases)", keep)
 
 
 def init_db(reset: bool = False) -> None:
@@ -126,13 +147,48 @@ def init_db(reset: bool = False) -> None:
     with conn() as c:
         version = c.execute("PRAGMA user_version").fetchone()[0]
         has_tables = c.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='cases'").fetchone()[0]
-        if has_tables and version < SCHEMA_VERSION:
+        if has_tables and version < 2:
             # The first prototype's tables have a different shape; its demo data is not kept.
             for t in ("orders", "cases", "events"):
                 c.execute(f"DROP TABLE IF EXISTS {t}")
+        elif has_tables and version == 2:
+            for col in ("sku", "colour"):
+                c.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT")
+        users = c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
+        if users and "courier" not in users[0]:
+            # v4 adds the pickup-partner role and addresses. SQLite can't change a CHECK, so the table is rebuilt (ids kept).
+            c.executescript("""
+                ALTER TABLE users RENAME TO users_v3;
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL, name TEXT, role TEXT NOT NULL CHECK (role IN ('customer', 'reviewer', 'courier')),
+                    password_hash TEXT NOT NULL, created_at TEXT, address TEXT);
+                INSERT INTO users (id, username, name, role, password_hash, created_at)
+                    SELECT id, username, name, role, password_hash, created_at FROM users_v3;
+                DROP TABLE users_v3;""")
         c.executescript(SCHEMA)
         c.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     seed()
+
+
+def reset_demo() -> dict:
+    """Start the demo again: remove every return with its photos, agent steps, reviews and history, number cases
+    from 1 again and re-seed the orders with fresh delivery dates. Users and sessions are kept."""
+    tables = ("cases", "media", "tool_calls", "reviews", "events", "pickups")
+    with conn() as c:
+        files = [r["file"] for r in c.execute("SELECT file FROM media")]
+        files += [r["photo"] for r in c.execute("SELECT photo FROM pickups WHERE photo IS NOT NULL")]
+        n_cases = c.execute("SELECT count(*) FROM cases").fetchone()[0]
+        for t in tables:
+            c.execute(f"DELETE FROM {t}")
+        c.execute(f"DELETE FROM sqlite_sequence WHERE name IN ({','.join('?' * len(tables))})", tables)
+    seed(reset=True)
+    removed = 0
+    for f in files:  # only the stored file names from the media table, always inside the upload folder
+        p = config.UPLOAD_DIR / f
+        if p.parent == config.UPLOAD_DIR and p.is_file():
+            p.unlink(); removed += 1
+    return {"cases": n_cases, "photos": removed}
 
 
 def _decode(row, fields):
@@ -155,7 +211,13 @@ def get_user_by_name(username: str):
 
 def get_user(user_id: int):
     with conn() as c:
-        row = c.execute("SELECT id, username, name, role FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = c.execute("SELECT id, username, name, role, address FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def first_courier():
+    with conn() as c:
+        row = c.execute("SELECT id, username, name FROM users WHERE role = 'courier' ORDER BY id LIMIT 1").fetchone()
     return dict(row) if row else None
 
 
@@ -307,3 +369,53 @@ def events_for(case_id: int):
     with conn() as c:
         rows = c.execute("SELECT * FROM events WHERE case_id = ? ORDER BY id", (case_id,)).fetchall()
     return [_decode(r, ("detail",)) for r in rows]
+
+
+# ---------------------------------------------------------------- doorstep pickups
+PICKUP_JSON = ("checks",)
+
+
+def save_pickup(case_id: int, **fields) -> None:
+    """Create the case's pickup, or start it again (a case has one pickup row; a re-approval reuses it)."""
+    fields = _encode(fields, PICKUP_JSON)
+    ts = now()
+    with conn() as c:
+        if c.execute("SELECT 1 FROM pickups WHERE case_id = ?", (case_id,)).fetchone():
+            cols = ", ".join(f"{k} = ?" for k in fields)
+            c.execute(f"UPDATE pickups SET {cols}, updated_at = ? WHERE case_id = ?", (*fields.values(), ts, case_id))
+        else:
+            cols = ", ".join(fields)
+            c.execute(f"INSERT INTO pickups (case_id, {cols}, created_at, updated_at) VALUES (?, {','.join('?' * len(fields))}, ?, ?)",
+                      (case_id, *fields.values(), ts, ts))
+
+
+def update_pickup(pickup_id: int, **fields) -> None:
+    fields = _encode(fields, PICKUP_JSON)
+    fields["updated_at"] = now()
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with conn() as c:
+        c.execute(f"UPDATE pickups SET {cols} WHERE id = ?", (*fields.values(), pickup_id))
+
+
+def get_pickup(pickup_id: int):
+    with conn() as c:
+        row = c.execute("SELECT * FROM pickups WHERE id = ?", (pickup_id,)).fetchone()
+    return _decode(row, PICKUP_JSON) if row else None
+
+
+def pickup_for_case(case_id: int):
+    with conn() as c:
+        row = c.execute("SELECT * FROM pickups WHERE case_id = ?", (case_id,)).fetchone()
+    return _decode(row, PICKUP_JSON) if row else None
+
+
+def pickup_by_photo(file: str):
+    with conn() as c:
+        row = c.execute("SELECT * FROM pickups WHERE photo = ?", (file,)).fetchone()
+    return _decode(row, PICKUP_JSON) if row else None
+
+
+def list_pickups(courier_id: int):
+    with conn() as c:
+        rows = c.execute("SELECT * FROM pickups WHERE courier_id = ? ORDER BY scheduled_for, id", (courier_id,)).fetchall()
+    return [_decode(r, PICKUP_JSON) for r in rows]

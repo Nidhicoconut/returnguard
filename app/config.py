@@ -85,9 +85,27 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "llama3.1")
 # Vision-language check of damage crops (tool T9). Gemini through its OpenAI-compatible endpoint.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 VLM_BASE_URL = os.getenv("VLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
-VLM_MODEL = os.getenv("VLM_MODEL", "gemini-2.5-flash")
+# gemini-2.5-flash allows only 20 free requests a day (ran out during testing on 2026-11-03); the lite model has
+# its own, larger free quota. Google retires model names over time: a 404 names the replacement.
+VLM_MODEL = os.getenv("VLM_MODEL", "gemini-3.5-flash-lite")
 VLM_MAX_CALLS = int(os.getenv("VLM_MAX_CALLS", "3"))  # per case
-# "none" turns off Gemini 2.5 Flash thinking (faster, and the reply is not cut short). Empty = model default.
-VLM_REASONING_EFFORT = os.getenv("VLM_REASONING_EFFORT", "none")
+# Empty = model default. With gemini-2.5-flash set "none": its thinking otherwise uses up max_tokens and cuts the
+# JSON reply short. gemini-3.5-flash-lite rejects "none" (use "minimal" or leave empty).
+VLM_REASONING_EFFORT = os.getenv("VLM_REASONING_EFFORT", "")
+# When Gemini is overloaded (5xx) or too slow, each call is retried once with this model. Keep each call short so
+# an outage costs seconds rather than the agent's whole 120 s budget.
+VLM_FALLBACK_MODEL = os.getenv("VLM_FALLBACK_MODEL", "gemini-2.5-flash")
+VLM_FALLBACK_REASONING_EFFORT = os.getenv("VLM_FALLBACK_REASONING_EFFORT", "none")  # 2.5 "thinks" unless told not to
+VLM_TIMEOUT = float(os.getenv("VLM_TIMEOUT", "25"))
+# Product check (tool T3, app/product.py): is the ordered item in the photos?
+PRODUCT_CHECK = os.getenv("PRODUCT_CHECK", "auto").lower()       # auto (when a Gemini key is set) | off
+PRODUCT_MISMATCH_CONF = float(os.getenv("PRODUCT_MISMATCH_CONF", "0.7"))  # Gemini "no" must be this sure
+CATALOG_DIR = Path(os.getenv("CATALOG_DIR", BASE_DIR / "catalog"))  # reference photos: catalog/<sku>/*.jpg
+# Searched too: listing photos of the Amazon demo products (research use only, gitignored)
+CATALOG_DIRS = [CATALOG_DIR, BASE_DIR / "demo_amazon" / "catalog"]
+# CLIP cosine, checked on 120 Roboflow garments: copies of the same photo >= 0.85 in 67%, different garments 0.8%;
+# Real customer close-ups score far lower (0.55-0.70 even for the right product), so catalog similarity
+# only ever confirms a match; it never flags a mismatch.
+CATALOG_MATCH_SIM = float(os.getenv("CATALOG_MATCH_SIM", "0.85"))
 # The plan only auto-approves a defect when the VLM confirms it. Set to 0 to allow detector-only approval.
 REQUIRE_VLM_FOR_APPROVAL = os.getenv("REQUIRE_VLM_FOR_APPROVAL", "1").lower() in ("1", "true", "yes")

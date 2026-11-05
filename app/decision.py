@@ -26,6 +26,8 @@ REASONS = {
     "INTEGRITY_FLAG": "Photo integrity flag",
     "LOW_QUALITY": "Low image quality",
     "NO_GARMENT": "Garment not visible",
+    "PRODUCT_MISMATCH": "Product mismatch",
+    "PRODUCT_UNVERIFIED": "Item not identified in photos",
     "TOOL_FAILURE": "A check failed",
     "HIGH_VALUE": "High-value order",
     "DEFECT_CONFIRMED": "Defect confirmed",
@@ -40,6 +42,7 @@ REASONS = {
     "CHANGE_OF_MIND": "Change of mind, item undamaged",
     "LLM_DISAGREES": "Language model disagreed",
     "GUARDRAIL": "Agent limit reached",
+    "PICKUP_CHECK_FAILED": "Failed doorstep check",
 }
 
 # Reason codes a reviewer must pick for each action (the plan requires one for every human decision).
@@ -70,7 +73,25 @@ def _out(decision, cited, reasons, code, recommendation="", request="", resoluti
 
 
 def policy_verdict(f: dict) -> dict:
-    """Return the rule outcome from the facts alone. First matching rule wins."""
+    """Return the rule outcome from the facts alone, then apply the item-identity gate (policy R5): an automatic
+    approval needs at least one photo that shows the ordered item. Close-ups of damage alone cannot show that
+    (a dark ribbed close-up fits a tee and a pair of tights equally), so the customer is asked for a photo of the
+    whole item first."""
+    out = _rules(f)
+    pc = f.get("product_check") or {}
+    if out["decision"] == APPROVE and pc.get("status") == "unverified":
+        order = f["order"]
+        if f.get("evidence_rounds_used", 0) < config.MAX_EVIDENCE_ROUNDS:
+            return _out(MORE, ["R5"], [f"None of the photos shows the whole {order['product']}, so we cannot confirm it is the item from this order."],
+                        "PRODUCT_UNVERIFIED", request=f"Please add a photo of the whole {order['product']}, laid flat, so we can confirm it is the item "
+                                                      "from this order. Your close-up photos are kept.", confidence=out["confidence"])
+        return _out(ESCALATE, out["cited"] + ["R5"], out["reasons"] + ["The item in the photos could not be confirmed as the one ordered."],
+                    "PRODUCT_UNVERIFIED", "Check that the photos show the ordered item before approving.", confidence=out["confidence"])
+    return out
+
+
+def _rules(f: dict) -> dict:
+    """The policy rules. First matching rule wins."""
     order = f.get("order")
     rounds_left = f.get("evidence_rounds_used", 0) < config.MAX_EVIDENCE_ROUNDS
     if not order:
@@ -105,6 +126,17 @@ def policy_verdict(f: dict) -> dict:
             return _out(MORE, ["R5"], ["The photos are not clear enough to check the garment."], code, request=ask)
         return _out(ESCALATE, ["R5"], ["The photos are still not clear enough after two requests."], code,
                     "Decide from the photos you have, or contact the customer.")
+
+    pc = f.get("product_check") or {}
+    if pc.get("status") == "mismatch":
+        seen = "; ".join(s for s in pc.get("seen") or [] if s)
+        why = [f"The photos do not appear to show the ordered {order['product']}" + (f" (they show: {seen})" if seen else "") + "."]
+        if rounds_left:
+            return _out(MORE, ["R5"], why, "PRODUCT_MISMATCH",
+                        request=f"Your photos don't look like the {order['product']} from order {order.get('order_id', '')}. "
+                                "Please send a photo of that item, laid flat so the whole garment is visible.")
+        return _out(ESCALATE, ["R5", "R8"], why + ["Still no match after the photo requests."], "PRODUCT_MISMATCH",
+                    "The photos may show a different item from the one ordered. Compare them with the order before deciding.")
 
     if not det:
         return _out(ESCALATE, ["R7"], ["The photo check could not run."], "TOOL_FAILURE", "Check the photos yourself.")

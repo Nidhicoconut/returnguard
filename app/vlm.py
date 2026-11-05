@@ -62,6 +62,43 @@ def _parse(text: str) -> dict:
             "confidence": max(0.0, min(1.0, float(data.get("confidence", 0.5)))), "description": str(data.get("description", ""))[:300]}
 
 
+_down_until = 0.0  # after both models failed, skip Gemini for a minute instead of waiting on every call
+
+
+def chat(body: dict) -> dict:
+    """POST one chat request to Gemini and return the reply JSON. Free-tier rate limit (429): wait once and retry.
+    Overloaded (5xx) or slow: retry once with the fallback model. Raises if that fails too."""
+    global _down_until
+    if time.time() < _down_until:
+        raise RuntimeError("Gemini unavailable (failed in the last minute); skipped")
+    waited = switched = False
+    for _ in range(3):
+        err = None
+        try:
+            r = httpx.post(f"{config.VLM_BASE_URL}/chat/completions", json=body,
+                           headers={"Authorization": f"Bearer {config.GEMINI_API_KEY}"}, timeout=config.VLM_TIMEOUT)
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            r, err = None, exc
+        if r is not None and r.status_code == 429 and not waited:
+            waited = True
+            time.sleep(min(float(r.headers.get("retry-after", 8) or 8), 15))
+            continue
+        if (r is None or r.status_code >= 500) and not switched and config.VLM_FALLBACK_MODEL:
+            switched = True
+            body = {**body, "model": config.VLM_FALLBACK_MODEL}
+            body.pop("reasoning_effort", None)
+            if config.VLM_FALLBACK_REASONING_EFFORT:
+                body["reasoning_effort"] = config.VLM_FALLBACK_REASONING_EFFORT
+            continue
+        break
+    if r is None or r.status_code >= 500:
+        _down_until = time.time() + 60
+    if r is None:
+        raise err
+    r.raise_for_status()
+    return r.json()
+
+
 def describe(img, region: dict | None) -> dict:
     """Blind description of one region (or the whole photo). Raises on API or parsing errors."""
     crop = crop_region(img, region)
@@ -76,14 +113,7 @@ def describe(img, region: dict | None) -> dict:
                                                       {"type": "image_url", "image_url": {"url": _encode(crop)}}]}]}
     if config.VLM_REASONING_EFFORT:
         body["reasoning_effort"] = config.VLM_REASONING_EFFORT
-    for attempt in range(2):
-        r = httpx.post(f"{config.VLM_BASE_URL}/chat/completions", json=body,
-                       headers={"Authorization": f"Bearer {config.GEMINI_API_KEY}"}, timeout=60)
-        if r.status_code == 429 and attempt == 0:  # free-tier rate limit: wait once, then retry
-            time.sleep(min(float(r.headers.get("retry-after", 8) or 8), 15))
-            continue
-        r.raise_for_status()
-        return _parse(r.json()["choices"][0]["message"]["content"])
+    return _parse(chat(body)["choices"][0]["message"]["content"])
 
 
 def compare(observations: list[dict], claimed_class: str | None) -> dict:

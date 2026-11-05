@@ -10,6 +10,7 @@ os.environ["LLM_PROVIDER"] = "rules"
 os.environ["VISION_BACKEND"] = "heuristic"
 os.environ["CLOTHES_MODEL"] = "off"
 os.environ["GEMINI_API_KEY"] = ""
+os.environ["PRODUCT_CHECK"] = "off"
 os.environ["AGENT_INLINE"] = "1"
 
 ROOT = Path(__file__).resolve().parent.parent

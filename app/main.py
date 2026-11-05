@@ -11,7 +11,7 @@ from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Respons
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
-from . import agent, auth, config, db, decision, llm, preanalysis, tools, vision, vlm
+from . import agent, auth, config, db, decision, llm, pickup, preanalysis, product, tools, vision, vlm
 from .security import verify_password
 
 logging.basicConfig(level=logging.INFO)
@@ -30,14 +30,16 @@ config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------- pages
 def _page(name: str):
-    return FileResponse(config.STATIC_DIR / name)
+    # no-cache: the browser re-checks each time, so an edited page or script is never served from a stale copy
+    return FileResponse(config.STATIC_DIR / name, headers={"Cache-Control": "no-cache"})
+
+
+HOME = {"customer": "/account", "reviewer": "/admin", "courier": "/pickup"}
 
 
 @app.get("/")
 def index(user=Depends(auth.current_user)):
-    if not user:
-        return RedirectResponse("/login")
-    return RedirectResponse("/review" if user["role"] == "reviewer" else "/customer")
+    return RedirectResponse(HOME[user["role"]] if user else "/login")
 
 
 @app.get("/login")
@@ -45,19 +47,43 @@ def login_page():
     return _page("login.html")
 
 
-@app.get("/customer")
+@app.get("/account")
+@app.get("/customer")  # older link
 def customer_page(user=Depends(auth.current_user)):
-    return _page("customer.html") if user and user["role"] == "customer" else RedirectResponse("/login?role=customer")
+    if user and user["role"] == "customer":
+        return _page("customer.html")
+    return RedirectResponse(HOME[user["role"]] if user else "/login")
 
 
-@app.get("/review")
+@app.get("/admin")
+@app.get("/review")  # older link
 def review_page(user=Depends(auth.current_user)):
-    return _page("review.html") if user and user["role"] == "reviewer" else RedirectResponse("/login?role=reviewer")
+    if user and user["role"] == "reviewer":
+        return _page("review.html")
+    return RedirectResponse(HOME[user["role"]] if user else "/login")
+
+
+@app.get("/pickup")
+def pickup_page(user=Depends(auth.current_user)):
+    if user and user["role"] == "courier":
+        return _page("pickup.html")
+    return RedirectResponse(HOME[user["role"]] if user else "/login")
+
+
+@app.get("/policy")
+def policy_page():
+    return _page("policy.html")
+
+
+@app.get("/api/policy")
+def policy_clauses():
+    from . import policy
+    return policy.all_clauses()
 
 
 @app.get("/static/{name}")
 def static_file(name: str):
-    if name not in ("app.css", "app.js"):
+    if name not in ("app.css", "app.js", "favicon.svg"):
         raise HTTPException(404, "Not found.")
     return _page(name)
 
@@ -66,7 +92,7 @@ def static_file(name: str):
 class Login(BaseModel):
     username: str
     password: str
-    role: Literal["customer", "reviewer"] | None = None
+    role: Literal["customer", "reviewer", "courier"] | None = None
 
 
 @app.post("/api/login")
@@ -101,9 +127,19 @@ def health():
             "return_window_days": config.RETURN_WINDOW_DAYS, "auto_approve_max_price": config.AUTO_APPROVE_MAX_PRICE}
 
 
+@app.post("/api/demo/reset")
+def demo_reset():
+    # Only offered with the test accounts (SHOW_DEMO_ACCOUNTS), so a public deployment cannot be wiped.
+    if not config.SHOW_DEMO_ACCOUNTS:
+        raise HTTPException(404, "Not found.")
+    out = db.reset_demo()
+    log.info("demo reset: %(cases)d returns and %(photos)d photos removed", out)
+    return out
+
+
 @app.get("/api/config")
 def public_config():
-    demo = [{"username": u, "password": p, "role": r} for u, _, r, p in db.DEMO_USERS] if config.SHOW_DEMO_ACCOUNTS else []
+    demo = [{"username": u, "name": n, "password": p, "role": r} for u, n, r, p in db.DEMO_USERS] if config.SHOW_DEMO_ACCOUNTS else []
     return {"demo_accounts": demo, "return_window_days": config.RETURN_WINDOW_DAYS, "max_photos": config.MAX_PHOTOS,
             "max_evidence_rounds": config.MAX_EVIDENCE_ROUNDS}
 
@@ -146,13 +182,32 @@ async def precheck(image: UploadFile = File(...), user=Depends(auth.require_cust
     return preanalysis.assess_quality(img)
 
 
+def _courier_skus(courier_id: int) -> set:
+    return {(db.get_order(db.get_case(p["case_id"])["order_id"]) or {}).get("sku") for p in db.list_pickups(courier_id)}
+
+
+@app.get("/catalog/{sku}/{file}")
+def catalog_photo(sku: str, file: str, user=Depends(auth.require_user)):
+    allowed = (user["role"] == "reviewer" or (user["role"] == "courier" and sku in _courier_skus(user["id"]))
+               or sku in {o["sku"] for o in db.list_orders(user["id"])})
+    if not allowed:
+        raise HTTPException(404, "Photo not found.")
+    match = [p for p in product.catalog_photos(sku) if p.name == file]
+    if not match:
+        raise HTTPException(404, "Photo not found.")
+    return FileResponse(match[0])
+
+
 @app.get("/media/{file}")
 def media(file: str, user=Depends(auth.require_user)):
-    m = db.media_by_file(file)
+    m = db.media_by_file(file) or db.pickup_by_photo(file)  # customer photos, or a pickup partner's doorstep photo
     if not m:
         raise HTTPException(404, "Photo not found.")
     case = db.get_case(m["case_id"])
-    if user["role"] != "reviewer" and case["user_id"] != user["id"]:
+    p = db.pickup_for_case(case["id"])
+    allowed = (user["role"] == "reviewer" or case["user_id"] == user["id"]
+               or (user["role"] == "courier" and p is not None and p["courier_id"] == user["id"]))
+    if not allowed:
         raise HTTPException(404, "Photo not found.")
     return FileResponse(config.UPLOAD_DIR / file)
 
@@ -176,11 +231,19 @@ def _checks_for_customer(c: dict) -> list[dict]:
     if pre:
         bad = pre["total"] - pre["ok_photos"]
         out.append({"ok": bad == 0, "text": "Photos are clear" if bad == 0 else f"{bad} of {pre['total']} photos were not clear enough"})
+    pc = (c.get("decision_detail") or {}).get("product_check") or {}
+    if order and pc.get("status") == "match":
+        out.append({"ok": True, "text": f"Photos match your {order['product']}"})
+    elif order and pc.get("status") == "mismatch":
+        out.append({"ok": False, "text": f"The photos don't look like your {order['product']}"})
     v = c.get("vision") or {}
     if v and c.get("status") != "Checking":
         claimed = (c.get("parsed_claim") or {}).get("defect_type")
-        if v.get("verdict") == "damaged":
+        confirmed = (c.get("vlm") or {}).get("status") == "damage_seen"
+        if v.get("verdict") == "damaged" and confirmed:
             out.append({"ok": True, "text": f"Damage found in your photo ({v.get('defect_type')})"})
+        elif v.get("verdict") == "damaged":
+            out.append({"ok": False, "text": "Our team will check the damage in your photos"})
         elif claimed:
             out.append({"ok": False, "text": "We could not see the damage you described"})
         elif v.get("verdict") == "clean":
@@ -188,26 +251,55 @@ def _checks_for_customer(c: dict) -> list[dict]:
     return out
 
 
-def _photo_list(case_id: int):
+PROBLEM_TEXT = {"too_small": "too small", "blurry": "blurry", "too_dark": "too dark", "too_bright": "too bright"}
+
+
+def _photo_status(c: dict | None, m: dict) -> dict | None:
+    """How a photo was used, for the green / yellow / red marks on the customer and reviewer pages."""
+    if not c or c.get("status") == "Checking" or m["quality"] is None:
+        return None
+    q, flags = m["quality"], (m["integrity"] or {}).get("flags") or []
+    if not q["ok"]:
+        return {"state": "bad", "text": "Not used: " + ", ".join(PROBLEM_TEXT.get(p, p) for p in q["problems"])}
+    detail = c.get("decision_detail") or {}
+    pp = next((p for p in (detail.get("product_check") or {}).get("per_photo", []) if p.get("media_id") == m["id"]), {})
+    if pp.get("visible") == "no" and pp.get("confidence", 0) >= config.PRODUCT_MISMATCH_CONF:
+        order = db.get_order(c["order_id"]) or {}
+        return {"state": "bad", "text": f"Not used: doesn't look like your {order.get('product', 'order')}"}
+    if flags:
+        return {"state": "warn", "text": "Our team will check this photo"}
+    v = c.get("vision") or {}
+    confirmed = (c.get("vlm") or {}).get("status") == "damage_seen"
+    if v.get("media_id") == m["id"] and v.get("verdict") == "damaged" and confirmed:
+        return {"state": "ok", "text": "Damage found here"}
+    if c.get("status") == decision.STATUS[decision.ESCALATE]:
+        return None  # no verdict on single photos while a reviewer decides
+    return {"state": "ok", "text": "Accepted"}
+
+
+def _photo_list(case_id: int, c: dict | None = None):
     return [{"id": m["id"], "url": f"/media/{m['file']}", "round": m["round"], "quality": m["quality"],
-             "integrity": {k: v for k, v in (m["integrity"] or {}).items() if k != "exif"}} for m in db.media_for(case_id)]
+             "integrity": {k: v for k, v in (m["integrity"] or {}).items() if k != "exif"}, "status": _photo_status(c, m)}
+            for m in db.media_for(case_id)]
 
 
 def _customer_view(c: dict) -> dict:
     reviews = db.reviews_for(c["id"])
     last = reviews[-1] if reviews else None
+    p = db.pickup_for_case(c["id"])
     return {"id": c["id"], "order_id": c["order_id"], "reason": c["reason"], "status": c["status"],
+            "display_status": pickup.display_status(c, p), "pickup": pickup.customer_info(c, p),
             "decision": c["decision"], "resolution": c["resolution"], "message": c["customer_message"],
             "request": c["request_message"], "evidence_rounds": c["evidence_rounds"], "max_evidence_rounds": config.MAX_EVIDENCE_ROUNDS,
             "decided_by": "reviewer" if last else ("agent" if c["decided_by"] == "agent" else c["decided_by"]),
             "review_note": last["note"] if last and last["action"] != "approve" else None,
             "steps": [{"step": s["step"], "summary": s["summary"]} for s in (c.get("trace") or [])],
-            "checks": _checks_for_customer(c), "photos": _photo_list(c["id"]),
+            "checks": _checks_for_customer(c), "photos": _photo_list(c["id"], c),
             "created_at": c["created_at"], "updated_at": c["updated_at"], "ticket_id": c["ticket_id"],
             "product": (db.get_order(c["order_id"]) or {}).get("product")}
 
 
-PRIORITY_HIGH = {"INTEGRITY_FLAG", "HIGH_VALUE", "CLAIM_CONTRADICTED", "DIFFERENT_DEFECT", "UNMENTIONED_DAMAGE", "GUARDRAIL", "APPEAL"}
+PRIORITY_HIGH = {"PICKUP_CHECK_FAILED", "PRODUCT_MISMATCH", "INTEGRITY_FLAG", "HIGH_VALUE", "CLAIM_CONTRADICTED", "DIFFERENT_DEFECT", "UNMENTIONED_DAMAGE", "GUARDRAIL", "APPEAL"}
 
 
 def _priority(c: dict) -> str:
@@ -227,6 +319,7 @@ def _reviewer_row(c: dict) -> dict:
             "customer": order.get("customer"), "status": c["status"], "decision": c["decision"], "reason_code": code,
             "reason": decision.REASONS.get(code, code or "Checking"), "priority": _priority(c),
             "flagged": any((m["integrity"] or {}).get("flags") for m in photos),
+            "display_status": pickup.display_status(c, db.pickup_for_case(c["id"])),
             "thumb": f"/media/{photos[0]['file']}" if photos else None, "created_at": c["created_at"], "updated_at": c["updated_at"]}
 
 
@@ -245,10 +338,25 @@ def _tidy_boxes(c: dict) -> dict:
 def _reviewer_view(c: dict) -> dict:
     c = _tidy_boxes(c)
     order = tools.lookup_order(c["order_id"])
-    return {**c, "order": order, "photos": _photo_list(c["id"]), "tool_calls": db.tool_calls_for(c["id"]),
+    catalog = [f"/catalog/{order['sku']}/{p.name}" for p in product.catalog_photos(order.get("sku"))] if order else []
+    return {**c, "order": order, "catalog_photos": catalog, "photos": _photo_list(c["id"], c), "tool_calls": db.tool_calls_for(c["id"]),
+            "pickup": _pickup_for_reviewer(c), "display_status": pickup.display_status(c, db.pickup_for_case(c["id"])),
             "reviews": db.reviews_for(c["id"]), "events": db.events_for(c["id"]), "priority": _priority(c),
             "reason_label": decision.REASONS.get((c.get("decision_detail") or {}).get("reason_code"), ""),
             "review_reasons": decision.REVIEW_REASONS}
+
+
+def _pickup_for_reviewer(c: dict):
+    p = db.pickup_for_case(c["id"])
+    if not p:
+        return None
+    courier = db.get_user(p["courier_id"]) if p["courier_id"] else None
+    labels = {k["key"]: k["text"] for k in pickup.checklist(c, db.get_order(c["order_id"]) or {"product": "item"})}
+    return {"status": p["status"], "scheduled_for": p["scheduled_for"], "slot": p["slot"], "attempts": p["attempts"],
+            "courier": courier["name"] if courier else None, "verified_at": p["verified_at"], "note": p["note"],
+            "checks": [{"text": labels.get(k, k), "ok": v} for k, v in (p["checks"] or {}).items()],
+            "photo": f"/media/{p['photo']}" if p["photo"] else None, "refund_amount": p["refund_amount"],
+            "refunded_at": p["refunded_at"], "failure": pickup.FAIL_REASONS.get(p["failure_reason"]) if p["failure_reason"] else None}
 
 
 def _own_case(case_id: int, user: dict) -> dict:
@@ -263,7 +371,13 @@ def orders(user=Depends(auth.require_customer)):
     out = []
     for o in db.list_orders(user["id"]):
         full = tools.lookup_order(o["order_id"])
-        out.append({k: full[k] for k in ("order_id", "product", "product_type", "price", "delivered_date", "days_since_delivery", "window_ok")})
+        photos = product.catalog_photos(full.get("sku"))
+        cases = [c for c in db.list_cases(user_id=user["id"]) if c["order_id"] == o["order_id"]]
+        out.append({**{k: full[k] for k in ("order_id", "product", "product_type", "colour", "price", "delivered_date",
+                                            "days_since_delivery", "window_ok")},
+                    "image": f"/catalog/{full['sku']}/{photos[0].name}" if photos else None,
+                    "return_id": cases[0]["id"] if cases else None,
+                    "return_status": pickup.display_status(cases[0], db.pickup_for_case(cases[0]["id"])) if cases else None})
     return out
 
 
@@ -371,7 +485,88 @@ def review(case_id: int, body: Review, user=Depends(auth.require_reviewer)):
         text = body.message.strip() or decision.REVIEW_REASONS["request_info"][body.reason_code] + "."
         fields = dict(status="Photos needed", request_message=text, customer_message=text)
     db.update_case(case_id, decided_by=user["name"], **fields)
+    if body.action == "approve":
+        pickup.schedule(case_id, user["name"])  # R9: collected and checked at the door before the refund
+    else:
+        pickup.cancel(case_id, user["name"])
     db.add_review(case_id, user["id"], body.action, body.reason_code, body.note.strip()[:1000], body.vision_feedback)
     db.add_event(case_id, user["name"], "review", {"action": body.action, "reason_code": body.reason_code, "note": body.note[:500],
                                                    "agent_decision": agent_decision, "vision_feedback": body.vision_feedback})
     return _reviewer_view(db.get_case(case_id))
+
+
+# ---------------------------------------------------------------- pickup partner (R9)
+def _assigned(pickup_id: int, user: dict) -> dict:
+    p = db.get_pickup(pickup_id)
+    if not p or p["courier_id"] != user["id"]:
+        raise HTTPException(404, "Pickup not found.")
+    return p
+
+
+def _pickup_view(p: dict, full: bool = False) -> dict:
+    c = _tidy_boxes(db.get_case(p["case_id"]))
+    order = tools.lookup_order(c["order_id"]) or {}
+    customer = db.get_user(c["user_id"]) or {}
+    catalog = [f"/catalog/{order['sku']}/{f.name}" for f in product.catalog_photos(order.get("sku"))] if order else []
+    out = {"id": p["id"], "case_id": c["id"], "status": p["status"], "scheduled_for": p["scheduled_for"], "slot": p["slot"],
+           "attempts": p["attempts"], "customer": customer.get("name"), "address": customer.get("address"),
+           "order_id": c["order_id"], "product": order.get("product"), "colour": order.get("colour"), "price": order.get("price"),
+           "image": catalog[0] if catalog else None, "kind": "Store credit" if c["resolution"] == "store_credit" else "Refund",
+           "verified_at": p["verified_at"], "failure": pickup.FAIL_REASONS.get(p["failure_reason"]) if p["failure_reason"] else None}
+    if full:
+        v = c.get("vision") or {}
+        photos = []
+        for m in db.media_for(c["id"]):
+            st = _photo_status(c, m)
+            if st and st["state"] == "bad":
+                continue  # photos that weren't used (unclear, or a different item) would only confuse the check
+            photos.append({"url": f"/media/{m['file']}", "regions": v.get("regions") if v.get("media_id") == m["id"] else [],
+                           "damage": bool(st and st["text"] == "Damage found here")})
+        out.update(reason=c["reason"], catalog_photos=catalog, photos=photos, checklist=pickup.checklist(c, order),
+                   fail_reasons=pickup.FAIL_REASONS, note=p["note"], photo=f"/media/{p['photo']}" if p["photo"] else None,
+                   max_attempts=pickup.MAX_ATTEMPTS)
+    return out
+
+
+@app.get("/api/pickups")
+def my_pickups(user=Depends(auth.require_courier)):
+    return [_pickup_view(p) for p in db.list_pickups(user["id"]) if p["status"] != "cancelled"]
+
+
+@app.get("/api/pickups/{pickup_id}")
+def pickup_detail(pickup_id: int, user=Depends(auth.require_courier)):
+    return _pickup_view(_assigned(pickup_id, user), full=True)
+
+
+@app.post("/api/pickups/{pickup_id}/complete")
+async def pickup_complete(pickup_id: int, code: str = Form(...), checks: str = Form(""), note: str = Form(""),
+                          photo: UploadFile | None = File(None), user=Depends(auth.require_courier)):
+    p = _assigned(pickup_id, user)
+    filename = None
+    if photo is not None and photo.filename:
+        (_, img), = await _read_photos([photo])
+        filename = f"pickup_{uuid.uuid4().hex}.jpg"
+        cv2.imwrite(str(config.UPLOAD_DIR / filename), img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    try:
+        p = pickup.complete(p, user, {k for k in checks.split(",") if k}, code, note, filename)
+    except ValueError as exc:
+        if filename:
+            (config.UPLOAD_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(422, str(exc))
+    return _pickup_view(p, full=True)
+
+
+class PickupFailure(BaseModel):
+    reason: str
+    note: str = ""
+    checks: list[str] = []
+
+
+@app.post("/api/pickups/{pickup_id}/fail")
+def pickup_fail(pickup_id: int, body: PickupFailure, user=Depends(auth.require_courier)):
+    p = _assigned(pickup_id, user)
+    try:
+        outcome = pickup.fail(p, user, body.reason, body.note, set(body.checks))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    return {"outcome": outcome, **_pickup_view(db.get_pickup(pickup_id), full=True)}

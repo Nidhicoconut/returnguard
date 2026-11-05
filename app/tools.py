@@ -5,7 +5,7 @@ import threading
 
 import cv2
 
-from . import config, db, llm, policy, preanalysis, vision, vlm
+from . import config, db, llm, policy, preanalysis, product, vision, vlm
 
 _VISION_LOCK = threading.Lock()  # one model run at a time; cases may be processed in parallel threads
 
@@ -61,6 +61,34 @@ def detect_defects(photos: list[dict], tiles: bool = False) -> dict:
     return {"best": best, "per_photo": results, "mode": "tiles" if tiles else "full"}
 
 
+def verify_product(photos: list[dict], order: dict) -> dict:
+    """T3: do the photos show the ordered item? Gemini type/colour check plus catalog similarity."""
+    imgs = [cv2.imread(str(config.UPLOAD_DIR / p["file"]), cv2.IMREAD_COLOR) for p in photos]
+    per_photo = [{"media_id": p["media_id"]} for p in photos]
+    errors, sources = [], []
+    if product.available():
+        try:
+            for pp, a in zip(per_photo, product.ask_gemini(imgs, order)):
+                pp.update(a)
+            sources.append("gemini")
+        except Exception as exc:  # quota, network, unreadable reply: the check is skipped, not failed
+            errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+    refs = product.catalog_photos(order.get("sku"))
+    if refs and config.PRODUCT_CHECK != "off":
+        try:
+            with _VISION_LOCK:
+                sims = product.catalog_similarity(imgs, refs)
+            for pp, s in zip(per_photo, sims):
+                pp["catalog_sim"] = s
+            sources.append(f"catalog ({len(refs)} photos)")
+        except Exception as exc:
+            errors.append(f"catalog: {type(exc).__name__}: {str(exc)[:160]}")
+    out = {**product.verdict(per_photo), "per_photo": per_photo, "sources": sources, "errors": errors}
+    if not sources:
+        out["status"] = "not_run"
+    return out
+
+
 def verify_with_vlm(file: str, regions: list[dict], claimed_class: str | None) -> dict:
     """T9: blind check of the top marked regions (or the whole photo when none) by a vision-language model."""
     if not vlm.available():
@@ -102,6 +130,7 @@ TOOLS = {
     "parse_claim": parse_claim,
     "assess_photos": assess_photos,
     "detect_defects": detect_defects,
+    "verify_product": verify_product,
     "verify_with_vlm": verify_with_vlm,
     "retrieve_policy": retrieve_policy,
     "create_ticket": create_ticket,

@@ -1,9 +1,9 @@
 # ReturnGuard
 
-An agentic vision copilot for clothing return verification. A customer signs in, picks an order, describes the problem and uploads photos. The agent **checks the photos** (quality and integrity), **looks for damage** (trained hole and stain detectors, plus an independent vision-language check), **reads the policy** (RAG) and reaches one of three outcomes: **auto-approve**, **ask for another photo**, or **send to a reviewer**. The one automatic decline is a return outside the 10-day window (the customer can appeal; turn it off with `AUTO_REJECT_OUTSIDE_WINDOW=0` to match the plan's "never auto-reject"). Every other rejection is made by a reviewer, with a reason code. Clothing only for now.
+An agentic vision copilot for clothing return verification. A customer signs in, picks an order, describes the problem and uploads photos. The agent **checks the photos** (quality and integrity), **looks for damage** (trained hole and stain detectors, plus an independent vision-language check), **reads the policy** (RAG) and reaches one of three outcomes: **auto-approve**, **ask for another photo**, or **send to a reviewer**. The one automatic decline is a return outside the 10-day window (the customer can appeal; turn it off with `AUTO_REJECT_OUTSIDE_WINDOW=0` to match the plan's "never auto-reject"). Every other rejection is made by a reviewer, with a reason code. An approved return is then **collected and checked at the door** by a pickup partner (policy R9): they compare the item with the order and the customer's photos, the customer confirms the handover with a 4-digit pickup code, and only then is the refund issued. A failed doorstep check goes back to a reviewer. Clothing only for now.
 
 ```
- /login ── role choice ──► /customer (mobile)                     /review (desktop)
+ /login ── one sign-in ───► /account (customer)                    /admin (reviewer)
                            new return, live agent steps,          queue, evidence pack,
                            outcome, extra photos, appeal          approve / reject / request info
                                    │                                      ▲
@@ -12,13 +12,13 @@ An agentic vision copilot for clothing return verification. A customer signs in,
                                    │
                                    ▼
  LangGraph agent (app/agent.py), max 8 tool calls / 120 s per case
-   get_order ► parse_claim ► check_photos ─(no usable photo)──────────────► retrieve_policy ► decide ► ticket
-      (T0)       (LLM)       (T1 + T7)     ► detect_defects ─(weak)► zoom_in ─┤
+   get_order ► parse_claim ► check_photos ► verify_product ─(wrong item / no usable photo)─► retrieve_policy ► decide ► ticket
+      (T0)       (LLM)       (T1 + T7)        (T3)        ► detect_defects ─(weak)► zoom_in ─┤
                                               (T4, YOLO)              (T4 tiles)
                                                    └─(needs 2nd look)► verify_with_vlm (T9, Gemini, blind) ┘
 ```
 
-**Design rules.** The rules in `app/decision.py` decide; the LLM only proposes and writes the wording. The LLM can make an outcome more cautious (it can stop an automatic approval) but never less. A defect is only auto-approved when the detector **and** the independent vision check both see it. Photo integrity flags, high-value orders (above ₹5,000) and any disagreement go to a reviewer; late returns are declined without checking the photos.
+**Design rules.** The rules in `app/decision.py` decide; the LLM only proposes and writes the wording. The LLM can make an outcome more cautious (it can stop an automatic approval) but never less. A defect is only auto-approved when the detector **and** the independent vision check both see it, and at least one photo shows the ordered item (product check T3: Gemini compares each photo with the order's type and colour, and a CLIP match against the catalog photos can confirm it). A photo of a different item, or only close-ups, leads to a request for a photo of the whole item. Photo integrity flags, high-value orders (above ₹5,000) and any disagreement go to a reviewer; late returns are declined without checking the photos.
 
 ## Quick start
 
@@ -30,14 +30,17 @@ copy .env.example .env                             # then add your keys (see bel
 uvicorn app.main:app --reload                      # open http://localhost:8000
 ```
 
-Demo accounts (local demo only; hide the hint with `SHOW_DEMO_ACCOUNTS=0`):
+Everyone signs in on the same page; reviewers are sent to `/admin` and customers to `/account`. Local accounts (the login page offers them under "Test accounts"; hide that with `SHOW_DEMO_ACCOUNTS=0` for a public deployment). Pick an account from the "Test account" dropdown to fill in the form; the ↻ button next to it resets the demo: it deletes every return and its photos, and case numbers start again at RG-000001:
 
 | Role | Username | Password | Orders |
 |---|---|---|---|
-| Customer | `asha` | `demo1234` | T-shirt, sweater, jeans delivered 25 days ago (outside the window) |
-| Customer | `ravi` | `demo1234` | Trousers, shirt, ₹6,999 jacket (above the auto-approve limit) |
-| Customer | `neha` | `demo1234` | Dress, socks (non-returnable), hoodie |
+| Customer | `asha` | `demo1234` | ORD-3001 crop sweater (white), ORD-3002 ribbed knit tee (army green) |
+| Customer | `ravi` | `demo1234` | ORD-3003 cable knit sweater set, ORD-3004 striped pyjama set |
+| Customer | `neha` | `demo1234` | ORD-3005 quilted tights (navy), ORD-3006 thermal knit set, 2-pack |
 | Reviewer | `reviewer` | `review1234` | Sees every case |
+| Pickup partner | `courier` | `pickup1234` | Collects approved returns at `/pickup` and checks them at the door |
+
+The demo orders are real Amazon Fashion products. Their listing photos and the matching damaged review photos are in `demo_amazon/` (local only, gitignored: Amazon Reviews 2023 is for research use only). `demo_amazon/README.md` lists which photo to upload for each order.
 
 Keys in `.env` (all optional; without them the app still runs on rules and keyword parsing):
 

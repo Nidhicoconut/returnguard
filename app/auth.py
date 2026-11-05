@@ -29,3 +29,10 @@ def require_reviewer(rg_session: str | None = Cookie(default=None)) -> dict:
     if user["role"] != "reviewer":
         raise HTTPException(403, "This page is for reviewers.")
     return user
+
+
+def require_courier(rg_session: str | None = Cookie(default=None)) -> dict:
+    user = require_user(rg_session)
+    if user["role"] != "courier":
+        raise HTTPException(403, "This page is for pickup partners.")
+    return user

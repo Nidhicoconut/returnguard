@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Return policy · ReturnGuard</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css?v=4">
+<style>
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.top { background: #fff; border-bottom: 1px solid var(--line); }
+.top .inner { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; }
+main { flex: 1; width: 100%; max-width: 760px; margin: 0 auto; padding: 40px 24px 64px; display: grid; gap: 24px; }
+.lead { color: var(--ink-2); font-size: 15px; margin-top: 8px; }
+.clause { padding: 20px 24px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 48px 1fr; gap: 12px; }
+.clause:last-child { border-bottom: 0; }
+.clause .id { font-family: var(--mono); font-size: 13px; color: var(--ink-3); padding-top: 2px; }
+.clause p { color: var(--ink-2); margin-top: 6px; max-width: 64ch; }
+</style>
+</head>
+<body>
+<header class="top"><div class="inner"><span id="logo"></span><a class="btn secondary sm" href="/">Your account</a></div></header>
+<main>
+  <div><h1>Return policy</h1><p class="lead">How returns of clothing work, and what we check before a refund.</p></div>
+  <section class="card" id="clauses"><div class="empty"><span class="spin"></span></div></section>
+</main>
+<script src="/static/app.js?v=4"></script>
+<script>
+$("logo").innerHTML = logoHTML();
+document.body.insertAdjacentHTML("beforeend", footerHTML());
+api("/api/policy").then((cl) => {
+  $("clauses").innerHTML = cl.map((c) => `<article class="clause"><span class="id">${esc(c.id)}</span><div><h3>${esc(c.title)}</h3><p>${esc(c.text)}</p></div></article>`).join("");
+}).catch(() => { $("clauses").innerHTML = `<div class="empty">The policy could not be loaded.</div>`; });
+</script>
+</body>
+</html>

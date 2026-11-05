@@ -20,7 +20,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from . import config, db, decision, llm, policy, tools, vlm
+from . import config, db, decision, llm, pickup, policy, product, tools, vlm
 
 
 class State(TypedDict, total=False):
@@ -34,6 +34,7 @@ class State(TypedDict, total=False):
     order: Any
     claim: Any
     photos: Any
+    product: Any
     detection: Any
     vision_check: Any
     clauses: Any
@@ -122,6 +123,22 @@ def check_photos(state: State) -> State:
     return {"photos": r, "calls": state["calls"], "trace": _step(state, "check_photos", msg, t0)}
 
 
+@_guarded
+def verify_product(state: State) -> State:
+    t0 = time.time()
+    order = state["order"]
+    r = _call(state, "verify_product", photos=_usable(state),
+              order={k: order.get(k) for k in ("order_id", "product", "product_type", "colour", "sku")})
+    seen = "; ".join(p.get("seen", "") for p in r.get("per_photo", []) if p.get("seen"))
+    msg = {"match": f"Photos show the ordered {order['product']}.",
+           "mismatch": f"Photos do not look like the ordered {order['product']}" + (f" (seen: {seen})" if seen else "") + ".",
+           "unverified": "Could not tell from the photos whether they show the ordered item.",
+           "not_run": "Product check skipped (no Gemini key or catalog photos)."}[r["status"]]
+    if r.get("errors"):
+        msg += " Errors: " + "; ".join(r["errors"])[:160]
+    return {"product": r, "calls": state["calls"], "trace": _step(state, "verify_product", msg, t0)}
+
+
 def _usable(state: State):
     return [p for p in state["photos"]["photos"] if p["ok"]]
 
@@ -196,6 +213,7 @@ def decide(state: State) -> State:
         "claims_defect": decision.claims_defect(state["reason"], state.get("claim")),
         "photo_quality": {k: photos.get(k) for k in ("ok_photos", "total", "instructions")} if photos else None,
         "integrity_flags": photos.get("integrity_flags", []),
+        "product_check": {k: v for k, v in (state.get("product") or {}).items() if k != "per_photo"} or None,
         "detection": {k: best.get(k) for k in ("verdict", "label", "confidence", "damage_score", "defect_type", "backend", "mode")} if best else None,
         "vision_check": {k: v for k, v in (state.get("vision_check") or {}).items() if k != "observations"} or None,
         "evidence_rounds_used": state.get("evidence_rounds", 0),
@@ -238,6 +256,14 @@ def _after_order(state: State) -> str:
 def _after_photos(state: State) -> str:
     if state.get("guardrail") or not _usable(state):
         return "retrieve_policy"  # nothing to detect on; ask for new photos
+    if product.available() or product.catalog_photos((state.get("order") or {}).get("sku")):
+        return "verify_product"
+    return "detect_defects"
+
+
+def _after_product(state: State) -> str:
+    if state.get("guardrail") or (state.get("product") or {}).get("status") == "mismatch":
+        return "retrieve_policy"  # wrong item in the photos: damage on it is irrelevant
     return "detect_defects"
 
 
@@ -266,12 +292,14 @@ def _after_zoom(state: State) -> str:
 
 def build_graph():
     g = StateGraph(State)
-    for fn in (get_order, parse_claim, check_photos, detect_defects, zoom_in, verify_with_vlm, retrieve_policy, decide, finalize):
+    for fn in (get_order, parse_claim, check_photos, verify_product, detect_defects, zoom_in, verify_with_vlm, retrieve_policy, decide, finalize):
         g.add_node(fn.__name__, fn)
     g.set_entry_point("get_order")
     g.add_conditional_edges("get_order", _after_order, {"parse_claim": "parse_claim", "retrieve_policy": "retrieve_policy"})
     g.add_edge("parse_claim", "check_photos")
-    g.add_conditional_edges("check_photos", _after_photos, {"detect_defects": "detect_defects", "retrieve_policy": "retrieve_policy"})
+    g.add_conditional_edges("check_photos", _after_photos, {"verify_product": "verify_product", "detect_defects": "detect_defects",
+                                                            "retrieve_policy": "retrieve_policy"})
+    g.add_conditional_edges("verify_product", _after_product, {"detect_defects": "detect_defects", "retrieve_policy": "retrieve_policy"})
     g.add_conditional_edges("detect_defects", _after_detect,
                             {"zoom_in": "zoom_in", "verify_with_vlm": "verify_with_vlm", "retrieve_policy": "retrieve_policy"})
     g.add_conditional_edges("zoom_in", _after_zoom, {"verify_with_vlm": "verify_with_vlm", "retrieve_policy": "retrieve_policy"})
@@ -314,11 +342,13 @@ def run_case(case_id: int) -> dict:
         parsed_claim=state.get("claim"), preanalysis=state.get("photos"), vision=best,
         vlm=state.get("vision_check"), citations=r["cited_clauses"],
         decision_detail={"reasons": r["reasons"], "source": r["source"], "agreement": r["agreement"], "notes": r["notes"],
-                         "reason_code": r["reason_code"],
+                         "reason_code": r["reason_code"], "product_check": state.get("product"),
                          "clauses": [c for c in policy.all_clauses() if c["id"] in set(r["cited_clauses"])],
                          "retrieved": [c["id"] for c in state.get("clauses", [])],
                          "per_photo": [{k: p.get(k) for k in ("media_id", "verdict", "damage_score", "defect_type", "regions")}
                                        for p in (state.get("detection") or {}).get("per_photo", [])]},
         trace=state["trace"],
     )
+    if r["status"] == decision.STATUS[decision.APPROVE]:
+        pickup.schedule(case_id, "agent")  # R9: the item is collected and checked at the door before the refund
     return db.get_case(case_id)
